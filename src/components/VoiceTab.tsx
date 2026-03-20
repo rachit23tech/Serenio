@@ -108,9 +108,12 @@ export function VoiceTab() {
 
     try {
       const result = await pipeline.processTurn(audioData, {
-        maxTokens: 60,
+        maxTokens: 120,
         temperature: 0.7,
-        systemPrompt: 'You are a helpful voice assistant. Keep responses concise — 1-2 sentences max.',
+        systemPrompt: `You are Solace, a warm and empathetic mental health companion. 
+                       Listen carefully to the user's feelings and respond with compassion and calm. 
+                       Ask gentle follow-up questions. Never give medical advice. 
+                       Keep responses short — 2-3 sentences max. Speak like a caring friend.`,
       }, {
         onTranscription: (text) => {
           setTranscript(text);
@@ -181,7 +184,10 @@ export function VoiceTab() {
         </div>
 
         <p className="voice-status">
-          {voiceState === 'idle' && 'Tap to start listening'}
+          {voiceState === 'idle' && 'Hi, I\'m Serenio. Tap to share how you feel...'}
+          {voiceState === 'listening' && 'I\'m listening... take your time 💙'}
+          {voiceState === 'processing' && 'Understanding you...'}
+          {voiceState === 'speaking' && 'Serenio is responding...'}
           {voiceState === 'loading-models' && 'Loading models...'}
           {voiceState === 'listening' && 'Listening... speak now'}
           {voiceState === 'processing' && 'Processing...'}
@@ -205,14 +211,14 @@ export function VoiceTab() {
 
       {transcript && (
         <div className="voice-transcript">
-          <h4>You said:</h4>
+          <h4>You shared:</h4>
           <p>{transcript}</p>
         </div>
       )}
 
       {response && (
         <div className="voice-response">
-          <h4>AI response:</h4>
+          <h4>Serenio says:</h4>
           <p>{response}</p>
         </div>
       )}
