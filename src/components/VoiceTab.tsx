@@ -109,8 +109,8 @@ export function VoiceTab() {
     try {
       const result = await pipeline.processTurn(audioData, {
         maxTokens: 120,
-        temperature: 0.7,
-        systemPrompt: `You are Solace, a warm and empathetic mental health companion. 
+        temperature: 0.9,
+        systemPrompt: `You are Sereno, a warm and empathetic mental health companion. 
                        Listen carefully to the user's feelings and respond with compassion and calm. 
                        Ask gentle follow-up questions. Never give medical advice. 
                        Keep responses short — 2-3 sentences max. Speak like a caring friend.`,
@@ -182,7 +182,9 @@ export function VoiceTab() {
         <div className="voice-orb" data-state={voiceState} style={{ '--level': audioLevel } as React.CSSProperties}>
           <div className="voice-orb-inner" />
         </div>
-
+        <p className="voice-tip" style={{fontSize: '0.8rem', opacity: 0.6, marginTop: '8px'}}>
+                       Speak slowly and clearly for best results
+        </p>
         <p className="voice-status">
           {voiceState === 'idle' && 'Hi, I\'m Serenio. Tap to share how you feel...'}
           {voiceState === 'listening' && 'I\'m listening... take your time 💙'}

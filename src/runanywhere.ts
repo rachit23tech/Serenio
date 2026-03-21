@@ -64,11 +64,11 @@ const MODELS: CompactModelDef[] = [
   // STT (sherpa-onnx archive)
   {
     id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Whisper Tiny English (ONNX)',
-    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
+    name: 'Whisper Base English (ONNX)',
+    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-base.en/resolve/main/sherpa-onnx-whisper-base.en.tar.gz',
     framework: LLMFramework.ONNX,
     modality: ModelCategory.SpeechRecognition,
-    memoryRequirement: 105_000_000,
+    memoryRequirement: 200_000_000,
     artifactType: 'archive' as const,
   },
   // TTS (sherpa-onnx archive)
