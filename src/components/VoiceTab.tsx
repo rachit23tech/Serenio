@@ -6,6 +6,34 @@ import { ModelBanner } from './ModelBanner';
 
 type VoiceState = 'idle' | 'loading-models' | 'listening' | 'processing' | 'speaking';
 
+const CRISIS_KEYWORDS = ['kill myself', 'killing myself', 'suicide', 'end my life', 'self harm', 'hurt myself', 'want to die'];
+const CRISIS_RESPONSE = "You matter so much. Please call iCall at 9152987821 right now. I'm here with you.";
+
+const SYSTEM_PROMPT = `You are Serenio. You ONLY respond like a caring close friend texting someone.
+
+STRICT OUTPUT RULES:
+- Maximum 1-2 sentences ONLY. Never more.
+- No lists. No bullets. No headers. No bold.
+- No formal language. No clinical words.
+- Never start with "I understand" or "I hear you"
+- Never give unsolicited advice
+- Always ask ONE gentle follow up question
+- Sound like a 25 year old friend texting
+
+BAD response example:
+"I understand you're feeling anxious. Here are some strategies: 1) Deep breathing 2) Meditation"
+
+GOOD response example:
+"That sounds really overwhelming. How long has it been feeling this way?"
+
+ANOTHER GOOD example:
+"Honestly that makes so much sense. What's been the hardest part of your day?"
+
+ANOTHER GOOD example:
+"You don't have to have it all figured out. What happened?"
+
+Remember: Short. Warm. Curious. Friend. NOT therapist.`;
+
 export function VoiceTab() {
   const llmLoader = useModelLoader(ModelCategory.Language, true);
   const sttLoader = useModelLoader(ModelCategory.SpeechRecognition, true);
@@ -18,12 +46,12 @@ export function VoiceTab() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [chatHistory, setChatHistory] = useState<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const [error, setError] = useState<string | null>(null);
+  const crisisDetected = useRef(false);
 
   const micRef = useRef<AudioCapture | null>(null);
   const pipelineRef = useRef<VoicePipeline | null>(null);
   const vadUnsub = useRef<(() => void) | null>(null);
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       micRef.current?.stop();
@@ -31,7 +59,6 @@ export function VoiceTab() {
     };
   }, []);
 
-  // Ensure all 4 models are loaded
   const ensureModels = useCallback(async (): Promise<boolean> => {
     setVoiceState('loading-models');
     setError(null);
@@ -53,13 +80,28 @@ export function VoiceTab() {
     return false;
   }, [vadLoader, sttLoader, llmLoader, ttsLoader]);
 
-  // Start listening
+  const saveToHistory = (userSaid: string, serenioSaid: string) => {
+    const entry = {
+      time: new Date().toLocaleString(),
+      userSaid,
+      serenioSaid,
+      mood: null,
+    };
+    const existing = JSON.parse(localStorage.getItem('serenio-history') || '[]');
+    existing.unshift(entry);
+    localStorage.setItem('serenio-history', JSON.stringify(existing));
+  };
+
+  const isCrisis = (text: string) =>
+    CRISIS_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
+
   const startListening = useCallback(async () => {
+    if (voiceState === 'speaking' || voiceState === 'processing') return;
     setTranscript('');
     setResponse('');
     setError(null);
+    crisisDetected.current = false;
 
-    // Load models if needed
     const anyMissing = !ModelManager.getLoadedModel(ModelCategory.Audio)
       || !ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
       || !ModelManager.getLoadedModel(ModelCategory.Language)
@@ -79,7 +121,6 @@ export function VoiceTab() {
       pipelineRef.current = new VoicePipeline();
     }
 
-    // Start VAD + mic
     VAD.reset();
 
     vadUnsub.current = VAD.onSpeechActivity((activity) => {
@@ -87,6 +128,8 @@ export function VoiceTab() {
         const segment = VAD.popSpeechSegment();
         if (segment && segment.samples.length > 1600) {
           processSpeech(segment.samples);
+        } else {
+          console.log('Ignored short audio segment');
         }
       }
     });
@@ -95,62 +138,75 @@ export function VoiceTab() {
       (chunk) => { VAD.processSamples(chunk); },
       (level) => { setAudioLevel(level); },
     );
-  }, [ensureModels]);
+  }, [ensureModels, voiceState]);
 
-  // Process a speech segment through the full pipeline
   const processSpeech = useCallback(async (audioData: Float32Array) => {
     const pipeline = pipelineRef.current;
     if (!pipeline) return;
 
-    // Stop mic during processing
     micRef.current?.stop();
     vadUnsub.current?.();
     setVoiceState('processing');
+    crisisDetected.current = false;
 
     try {
       const result = await pipeline.processTurn(audioData, {
-       maxTokens: 120,
-       temperature: 0.9,
-       systemPrompt: `You are Serenio, a warm and empathetic mental health companion. 
-       Listen carefully to the user's feelings and respond with compassion and calm. 
-       Ask gentle follow-up questions.
-       If the user mentions self harm, suicide, or crisis — always respond with:
-      "I hear you. Please reach out to a counselor or call a helpline immediately. You are not alone."
-       Never give medical advice.
-       Keep responses short — 2-3 sentences max.
-       Speak like a caring friend.`,
+        maxTokens: 35,
+        temperature: 0.7,
+        systemPrompt: SYSTEM_PROMPT,
       }, {
         onTranscription: (text) => {
           setTranscript(text);
+          // Detect crisis immediately after transcription
+          if (isCrisis(text)) {
+            crisisDetected.current = true;
+            setResponse(CRISIS_RESPONSE);
+            saveToHistory(text, CRISIS_RESPONSE);
+            setChatHistory(prev => [
+              ...prev,
+              { role: 'user', content: text },
+              { role: 'assistant', content: CRISIS_RESPONSE },
+            ]);
+          }
         },
         onResponseToken: (_token, accumulated) => {
-          setResponse(accumulated);
+          // Don't override crisis response
+          if (!crisisDetected.current) {
+            setResponse(accumulated);
+          }
         },
         onResponseComplete: (text) => {
-          setResponse(text);
+          // Don't override crisis response
+          if (!crisisDetected.current) {
+            setResponse(text);
+          }
         },
         onSynthesisComplete: async (audio, sampleRate) => {
-          setVoiceState('speaking');
-          const player = new AudioPlayback({ sampleRate });
-          await player.play(audio, sampleRate);
-          player.dispose();
+          // Don't play TTS if crisis — too cold for crisis situation
+          if (!crisisDetected.current) {
+            setVoiceState('speaking');
+            const player = new AudioPlayback({ sampleRate });
+            await player.play(audio, sampleRate);
+            player.dispose();
+          }
         },
         onStateChange: (s) => {
           if (s === 'processingSTT') setVoiceState('processing');
           if (s === 'generatingResponse') setVoiceState('processing');
-          if (s === 'playingTTS') setVoiceState('speaking');
+          if (s === 'playingTTS' && !crisisDetected.current) setVoiceState('speaking');
         },
       });
 
-      if (result) {
-       setTranscript(result.transcription);
-       setResponse(result.response);
-       setChatHistory(prev => [
-      ...prev,
-    {role: 'user', content: result.transcription},
-    {role: 'assistant', content: result.response}
-  ]);
-}
+      if (result && !crisisDetected.current) {
+        setTranscript(result.transcription);
+        setResponse(result.response);
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'user', content: result.transcription },
+          { role: 'assistant', content: result.response },
+        ]);
+        saveToHistory(result.transcription, result.response);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -166,7 +222,6 @@ export function VoiceTab() {
     setAudioLevel(0);
   }, []);
 
-  // Which loaders are still loading?
   const pendingLoaders = [
     { label: 'VAD', loader: vadLoader },
     { label: 'STT', loader: sttLoader },
@@ -186,26 +241,34 @@ export function VoiceTab() {
         />
       )}
 
-      {error && <div className="model-banner"><span className="error-text">{error}</span></div>}
+      {error && (
+        <div className="model-banner">
+          <span className="error-text">{error}</span>
+        </div>
+      )}
 
       <div className="voice-center">
-        <div className="voice-orb" data-state={voiceState} style={{ '--level': audioLevel } as React.CSSProperties}>
+        <div
+          className="voice-orb"
+          data-state={voiceState}
+          style={{ '--level': audioLevel } as React.CSSProperties}
+        >
           <div className="voice-orb-inner" />
         </div>
+
         <p className="voice-status">
-          {voiceState === 'idle' && 'Hi, I\'m Serenio. Tap to share how you feel...'}
-          {voiceState === 'listening' && 'I\'m listening... take your time 💙'}
+          {voiceState === 'idle' && "Hi, I'm Serenio. Tap to share how you feel..."}
+          {voiceState === 'loading-models' && 'Loading models...'}
+          {voiceState === 'listening' && "I'm listening... take your time 💙"}
           {voiceState === 'processing' && 'Understanding you...'}
           {voiceState === 'speaking' && 'Serenio is responding...'}
-          {voiceState === 'loading-models' && 'Loading models...'}
-          {voiceState === 'listening' && 'Listening... speak now'}
-          {voiceState === 'processing' && 'Processing...'}
-          {voiceState === 'speaking' && 'Speaking...'}
         </p>
-        <p className="voice-tip" style={{fontSize: '0.8rem', opacity: 0.6, marginTop: '8px'}}>
-                       Speak slowly and clearly for best results
+
+        <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '8px' }}>
+          Speak slowly and clearly for best results
         </p>
-        {voiceState === 'idle' || voiceState === 'loading-models' ? (
+
+        {(voiceState === 'idle' || voiceState === 'loading-models') ? (
           <button
             className="btn btn-primary btn-lg"
             onClick={startListening}
@@ -225,6 +288,21 @@ export function VoiceTab() {
           <h4>You shared:</h4>
           <p>{transcript}</p>
         </div>
+      )}
+
+      {chatHistory.length > 0 && (
+        <button
+          className="btn"
+          style={{ fontSize: '0.75rem', opacity: 0.6, marginBottom: '8px' }}
+          onClick={() => {
+            setChatHistory([]);
+            setTranscript('');
+            setResponse('');
+            crisisDetected.current = false;
+          }}
+        >
+          🔄 Start fresh
+        </button>
       )}
 
       {response && (

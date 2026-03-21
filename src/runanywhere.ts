@@ -1,15 +1,3 @@
-/**
- * RunAnywhere SDK initialization and model catalog.
- *
- * This module:
- * 1. Initializes the core SDK (TypeScript-only, no WASM)
- * 2. Registers the LlamaCPP backend (loads LLM/VLM WASM)
- * 3. Registers the ONNX backend (sherpa-onnx — STT/TTS/VAD)
- * 4. Registers the model catalog and wires up VLM worker
- *
- * Import this module once at app startup.
- */
-
 import {
   RunAnywhere,
   SDKEnvironment,
@@ -22,16 +10,21 @@ import {
 import { LlamaCPP, VLMWorkerBridge } from '@runanywhere/web-llamacpp';
 import { ONNX } from '@runanywhere/web-onnx';
 
-// Vite bundles the worker as a standalone JS chunk and returns its URL.
 // @ts-ignore — Vite-specific ?worker&url query
 import vlmWorkerUrl from './workers/vlm-worker?worker&url';
 
-// ---------------------------------------------------------------------------
-// Model catalog
-// ---------------------------------------------------------------------------
-
 const MODELS: CompactModelDef[] = [
-  // LLM — Liquid AI LFM2 350M (small + fast for chat)
+  // LLM — Llama 3.2 1B Instruct (primary)
+  {
+    id: 'llama-3.2-1b-instruct-q4_k_m',
+    name: 'Llama 3.2 1B Instruct',
+    repo: 'bartowski/Llama-3.2-1B-Instruct-GGUF',
+    files: ['Llama-3.2-1B-Instruct-Q4_K_M.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 808_000_000,
+  },
+  // LLM — LFM2 350M (fallback)
   {
     id: 'lfm2-350m-q4_k_m',
     name: 'LFM2 350M Q4_K_M',
@@ -41,7 +34,7 @@ const MODELS: CompactModelDef[] = [
     modality: ModelCategory.Language,
     memoryRequirement: 250_000_000,
   },
-  // LLM — Liquid AI LFM2 1.2B Tool (optimized for tool calling & function calling)
+  // LLM — LFM2 1.2B Tool
   {
     id: 'lfm2-1.2b-tool-q4_k_m',
     name: 'LFM2 1.2B Tool Q4_K_M',
@@ -51,7 +44,7 @@ const MODELS: CompactModelDef[] = [
     modality: ModelCategory.Language,
     memoryRequirement: 800_000_000,
   },
-  // VLM — Liquid AI LFM2-VL 450M (vision + language)
+  // VLM — LFM2-VL 450M
   {
     id: 'lfm2-vl-450m-q4_0',
     name: 'LFM2-VL 450M Q4_0',
@@ -61,17 +54,17 @@ const MODELS: CompactModelDef[] = [
     modality: ModelCategory.Multimodal,
     memoryRequirement: 500_000_000,
   },
-  // STT (sherpa-onnx archive)
+  // STT — Whisper Tiny
   {
     id: 'sherpa-onnx-whisper-tiny.en',
-    name: 'Whisper Base English (ONNX)',
-    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-base.en/resolve/main/sherpa-onnx-whisper-base.en.tar.gz',
+    name: 'Whisper Tiny English (ONNX)',
+    url: 'https://huggingface.co/runanywhere/sherpa-onnx-whisper-tiny.en/resolve/main/sherpa-onnx-whisper-tiny.en.tar.gz',
     framework: LLMFramework.ONNX,
     modality: ModelCategory.SpeechRecognition,
-    memoryRequirement: 200_000_000,
+    memoryRequirement: 105_000_000,
     artifactType: 'archive' as const,
   },
-  // TTS (sherpa-onnx archive)
+  // TTS — Piper US English
   {
     id: 'vits-piper-en_US-lessac-medium',
     name: 'Piper TTS US English (Lessac)',
@@ -81,7 +74,7 @@ const MODELS: CompactModelDef[] = [
     memoryRequirement: 65_000_000,
     artifactType: 'archive' as const,
   },
-  // VAD (single ONNX file)
+  // VAD — Silero
   {
     id: 'silero-vad-v5',
     name: 'Silero VAD v5',
@@ -93,31 +86,22 @@ const MODELS: CompactModelDef[] = [
   },
 ];
 
-// ---------------------------------------------------------------------------
-// Initialization
-// ---------------------------------------------------------------------------
-
 let _initPromise: Promise<void> | null = null;
 
-/** Initialize the RunAnywhere SDK. Safe to call multiple times. */
 export async function initSDK(): Promise<void> {
   if (_initPromise) return _initPromise;
 
   _initPromise = (async () => {
-    // Step 1: Initialize core SDK (TypeScript-only, no WASM)
     await RunAnywhere.initialize({
       environment: SDKEnvironment.Development,
       debug: true,
     });
 
-    // Step 2: Register backends (loads WASM automatically)
     await LlamaCPP.register();
     await ONNX.register();
 
-    // Step 3: Register model catalog
     RunAnywhere.registerModels(MODELS);
 
-    // Step 4: Wire up VLM worker
     VLMWorkerBridge.shared.workerUrl = vlmWorkerUrl;
     RunAnywhere.setVLMLoader({
       get isInitialized() { return VLMWorkerBridge.shared.isInitialized; },
@@ -130,10 +114,8 @@ export async function initSDK(): Promise<void> {
   return _initPromise;
 }
 
-/** Get acceleration mode after init. */
 export function getAccelerationMode(): string | null {
   return LlamaCPP.isRegistered ? LlamaCPP.accelerationMode : null;
 }
 
-// Re-export for convenience
 export { RunAnywhere, ModelManager, ModelCategory, VLMWorkerBridge };
