@@ -1,9 +1,9 @@
+/* Google Font — Nunito for calming thin/light weights */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Google Font — Nunito for calming thin/light weights */
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@200;300;400;500;600&display=swap');
 
 :root {
   --bg: #070b10;

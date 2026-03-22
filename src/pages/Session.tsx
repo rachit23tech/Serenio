@@ -1,145 +1,319 @@
 /**
  * Session.tsx — Chat with Serenio
- * Send button uses t.accent — teal in dark, orange in light
  * Route: /session
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../context/ThemeContext";
 import { useHistory } from "../context/HistoryContext";
 import { getTheme } from "../tokens";
+import { ModelManager, ModelCategory } from '@runanywhere/web';
+import { TextGeneration } from '@runanywhere/web-llamacpp';
 
-interface Message { id: number; role: "ai" | "user"; text: string; }
+interface Message { id: number; role: "ai" | "user"; text: string; time: string; }
 
-const AI_REPLIES = [
-  "I hear you. It sounds like things have been weighing on you. You don't have to carry this alone.",
-  "Thank you for sharing that. Your feelings are completely valid — let's sit with this together.",
-  "That takes courage to say. I'm here with you, there's no rush.",
-  "Sometimes naming what we feel is the hardest step. You've already done that.",
-  "It makes sense you'd feel that way. What do you think is underneath that feeling?",
-];
+const CRISIS_KEYWORDS = ['kill myself', 'killing myself', 'suicide', 'end my life', 'self harm', 'hurt myself', 'want to die'];
+const CRISIS_RESPONSE = "You matter so much. Please call iCall at 9152987821 right now. I'm here with you.";
+
+const SYSTEM_PROMPT = `You are a chill friend texting someone. Keep it real and casual.
+
+RULES:
+- Max 1 sentence reply. Always. Never more than 1 sentence.
+- Never assume how someone feels
+- Never use words like "normal", "valid", "totally", "absolutely"
+- Don't start with "Hey!" every time
+- Only ask about what they literally said, nothing extra
+- Sound like a 22 year old texting a close friend
+- No emojis unless user used one first
+- No formal language at all
+
+GOOD examples:
+User: "I'm tired" → "rough day or just not sleeping well?"
+User: "everything's good" → "nice, what's been keeping you busy?"
+User: "idk" → "that's fair, take your time"
+User: "I'm stressed about exams" → "how many do you have coming up?"
+User: "feeling low" → "what's going on?"
+
+BAD examples (never do this):
+"It's totally normal to feel this way!"
+"I understand how you feel, that must be hard."
+"Here are some strategies that might help:"`;
+
+function getTime() {
+  return new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
 
 export default function Session() {
   const { dark } = useTheme();
   const t = getTheme(dark);
   const { addSession } = useHistory();
+
   const [messages, setMessages] = useState<Message[]>([
-    { id: 1, role: "ai", text: "Hi! I'm here to listen. How are you feeling today?" },
+    { id: 1, role: "ai", text: "Hey there! I'm so glad you're here. How are you feeling today?", time: getTime() }
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const processingRef = useRef(false);
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, isTyping]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isTyping]);
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
-    const userText = input.trim();
-    setMessages((prev) => [...prev, { id: Date.now(), role: "user", text: userText }]);
-    setInput(""); setIsTyping(true);
-    setTimeout(() => {
-      const reply = AI_REPLIES[Math.floor(Math.random() * AI_REPLIES.length)];
-      setMessages((prev) => [...prev, { id: Date.now() + 1, role: "ai", text: reply }]);
-      setIsTyping(false);
-      addSession({ type: "chat", date: new Date(), mood: "okay", userText, serenioResponse: reply });
-    }, 1500);
+  useEffect(() => {
+    const check = () => {
+      const model = ModelManager.getLoadedModel(ModelCategory.Language);
+      setModelReady(!!model);
+      return !!model;
+    };
+    if (!check()) {
+      const interval = setInterval(() => {
+        if (check()) clearInterval(interval);
+      }, 2000);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
+  const isCrisis = (text: string) =>
+    CRISIS_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
+
+  const saveToStorage = (userSaid: string, serenioSaid: string) => {
+    const entry = { time: new Date().toLocaleString(), userSaid, serenioSaid, mood: null };
+    const existing = JSON.parse(localStorage.getItem('serenio-history') || '[]');
+    existing.unshift(entry);
+    localStorage.setItem('serenio-history', JSON.stringify(existing));
   };
 
-  // User bubble: light uses orange, dark uses muted navy-teal
+  const sendMessage = useCallback(async () => {
+    const userText = input.trim();
+    if (!userText || isTyping || processingRef.current) return;
+
+    processingRef.current = true;
+    setInput('');
+    setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: userText, time: getTime() }]);
+    setIsTyping(true);
+
+    if (isCrisis(userText)) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: CRISIS_RESPONSE, time: getTime() }]);
+        setIsTyping(false);
+        processingRef.current = false;
+        saveToStorage(userText, CRISIS_RESPONSE);
+        addSession({ type: 'chat', date: new Date(), mood: 'okay', userText, serenioResponse: CRISIS_RESPONSE });
+      }, 400);
+      return;
+    }
+
+    if (!modelReady) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: "give me a sec, still loading 💙", time: getTime() }]);
+        setIsTyping(false);
+        processingRef.current = false;
+      }, 400);
+      return;
+    }
+
+    try {
+      const fullPrompt = `${SYSTEM_PROMPT}\n\nUser: ${userText}\nSerenio:`;
+      const aiMsgId = Date.now() + 1;
+
+      setMessages(prev => [...prev, { id: aiMsgId, role: 'ai', text: '', time: getTime() }]);
+      setIsTyping(false);
+
+      const { stream, result: resultPromise } = await TextGeneration.generateStream(fullPrompt, {
+        maxTokens: 25,
+        temperature: 0.8,
+      });
+
+      let accumulated = '';
+      for await (const token of stream) {
+        accumulated += token;
+        setMessages(prev => prev.map(m =>
+          m.id === aiMsgId ? { ...m, text: accumulated } : m
+        ));
+      }
+
+      const result = await resultPromise;
+      const finalText = (result.text || accumulated).trim();
+
+      setMessages(prev => prev.map(m =>
+        m.id === aiMsgId ? { ...m, text: finalText } : m
+      ));
+
+      saveToStorage(userText, finalText);
+      addSession({ type: 'chat', date: new Date(), mood: 'okay', userText, serenioResponse: finalText });
+
+    } catch (err) {
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: "something went wrong, try again", time: getTime() }]);
+    } finally {
+      setIsTyping(false);
+      processingRef.current = false;
+    }
+  }, [input, isTyping, modelReady, addSession]);
+
+  const chatBg = dark ? t.bg : "#FAF8F4";
+  const aiBubbleBg = dark ? t.card : "#F5F1EB";
+  const aiBubbleText = dark ? t.textPrimary : "#2D2D2D";
   const userBubbleBg = dark ? "#2A3855" : t.accent;
-  const userBubbleText = dark ? "#B8D8D8" : "#FFFFFF";
+  const avatarBg = dark ? "#3D5A4A" : "#7DB591";
+  const timeColor = dark ? t.textMuted : "#B0A99F";
+  const inputBg = dark ? t.input : "#F5F1EB";
+  const borderColor = dark ? t.border : "#EDE9E3";
 
   return (
     <div style={{ minHeight: "100vh", background: t.bg, display: "flex" }}>
       <Sidebar active="chat" />
 
-      <div style={{ flex: 1, marginLeft: 240, display: "flex", flexDirection: "column", height: "100vh" }}>
-        {/* Header */}
-        <div style={{ padding: "28px 36px 20px", flexShrink: 0, borderBottom: `1px solid ${t.border}`, background: t.bg }}>
-          <h1 style={{ fontSize: 24, fontWeight: 700, color: t.textPrimary, margin: 0, fontFamily: "'Nunito',sans-serif" }}>
-            Chat with Serenio
-          </h1>
-        </div>
+      <div style={{ flex: 1, marginLeft: 240, display: "flex", flexDirection: "column", height: "100vh", background: chatBg }}>
 
-        {/* Messages */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "24px 36px 120px", display: "flex", flexDirection: "column", gap: 16 }}>
-          {messages.map((msg) => (
-            <div key={msg.id} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
-              <div style={{
-                maxWidth: "70%", padding: "14px 18px", borderRadius: 20,
-                fontSize: 14, lineHeight: 1.65, fontFamily: "'Nunito',sans-serif",
-                background: msg.role === "ai" ? t.card : userBubbleBg,
-                color: msg.role === "ai" ? t.textPrimary : userBubbleText,
-                borderBottomLeftRadius: msg.role === "ai" ? 4 : 20,
-                borderBottomRightRadius: msg.role === "user" ? 4 : 20,
-                boxShadow: msg.role === "ai" ? t.cardShadow : "none",
-                border: msg.role === "ai" ? `1px solid ${t.border}` : "none",
-              }}>
-                {msg.text}
-              </div>
+        {/* Narrowed chat card */}
+        <div style={{
+          flex: 1, margin: "20px 200px 0",
+          borderRadius: "16px 16px 0 0",
+          background: dark ? t.card : "#F5F1EB",
+          border: `1px solid ${borderColor}`,
+          borderBottom: "none",
+          display: "flex", flexDirection: "column", overflow: "hidden",
+        }}>
+
+          {/* Header */}
+          <div style={{
+            padding: "20px 24px",
+            borderBottom: `1px solid ${borderColor}`,
+            display: "flex", alignItems: "center", gap: 14,
+            background: dark ? t.card : "#F5F1EB",
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: "50%",
+              background: avatarBg,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 20, flexShrink: 0, color: "#fff",
+            }}>
+              ✦
             </div>
-          ))}
-          {isTyping && (
-            <div style={{ display: "flex", justifyContent: "flex-start" }}>
-              <div style={{
-                padding: "14px 18px", borderRadius: 20, borderBottomLeftRadius: 4,
-                background: t.card, border: `1px solid ${t.border}`, boxShadow: t.cardShadow,
+            <div>
+              <p style={{ fontSize: 16, fontWeight: 700, color: aiBubbleText, margin: 0, fontFamily: "'Nunito',sans-serif" }}>
+                Serenio
+              </p>
+              <p style={{ fontSize: 13, color: timeColor, margin: 0, fontFamily: "'Nunito',sans-serif" }}>
+                {modelReady ? "Your mental wellness companion" : "⏳ loading..."}
+              </p>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ flex: 1, overflowY: "auto", padding: "24px", display: "flex", flexDirection: "column", gap: 20 }}>
+            {messages.map((msg) => (
+              <div key={msg.id} style={{
+                display: "flex",
+                flexDirection: msg.role === "ai" ? "row" : "column",
+                alignItems: msg.role === "ai" ? "flex-start" : "flex-end",
+                gap: msg.role === "ai" ? 12 : 6,
               }}>
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  {[0, 1, 2].map((i) => (
-                    <div key={i} style={{
-                      width: 8, height: 8, borderRadius: "50%",
-                      background: t.accent,
-                      animation: "bounce 0.8s ease-in-out infinite",
-                      animationDelay: `${i * 0.15}s`,
-                    }} />
-                  ))}
+                {msg.role === "ai" && (
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: avatarBg, flexShrink: 0,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 16, color: "#fff",
+                  }}>
+                    ✦
+                  </div>
+                )}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: msg.role === "ai" ? "flex-start" : "flex-end", gap: 4, maxWidth: "65%" }}>
+                  <div style={{
+                    padding: "14px 18px",
+                    borderRadius: msg.role === "ai" ? "4px 18px 18px 18px" : "18px 18px 4px 18px",
+                    fontSize: 14, lineHeight: 1.65,
+                    fontFamily: "'Nunito',sans-serif",
+                    background: msg.role === "ai" ? aiBubbleBg : userBubbleBg,
+                    color: msg.role === "ai" ? aiBubbleText : "#F5F1EB",
+                    boxShadow: msg.role === "ai" ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
+                    border: msg.role === "ai" ? `1px solid ${borderColor}` : "none",
+                  }}>
+                    {msg.text || '...'}
+                  </div>
+                  <span style={{ fontSize: 11, color: timeColor, fontFamily: "'Nunito',sans-serif" }}>
+                    {msg.time}
+                  </span>
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
+            ))}
+
+            {isTyping && (
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                <div style={{
+                  width: 36, height: 36, borderRadius: "50%",
+                  background: avatarBg, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 16, color: "#fff",
+                }}>✦</div>
+                <div style={{
+                  padding: "14px 18px", borderRadius: "4px 18px 18px 18px",
+                  background: aiBubbleBg, border: `1px solid ${borderColor}`,
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+                }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                    {[0, 1, 2].map((i) => (
+                      <div key={i} style={{
+                        width: 8, height: 8, borderRadius: "50%",
+                        background: avatarBg,
+                        animation: "bounce 0.8s ease-in-out infinite",
+                        animationDelay: `${i * 0.15}s`,
+                      }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
         </div>
 
-        {/* Input bar — fixed at bottom */}
+        {/* Input bar — same narrow width */}
         <div style={{
-          padding: "16px 36px 24px", flexShrink: 0,
-          borderTop: `1px solid ${t.border}`, background: t.bg,
-          position: "fixed", bottom: 0, left: 240, right: 0,
+          margin: "0 200px 20px",
+          padding: "16px 20px",
+          background: dark ? t.card : "#F5F1EB",
+          border: `1px solid ${borderColor}`,
+          borderTop: "none",
+          borderRadius: "0 0 16px 16px",
         }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "center", maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type how you're feeling..."
+              placeholder="Share what's on your mind..."
               style={{
-                flex: 1, padding: "14px 20px", borderRadius: 50,
-                border: `1px solid ${t.border}`, background: t.input,
-                color: t.textPrimary, fontSize: 14, outline: "none",
-                boxShadow: t.cardShadow, fontFamily: "'Nunito',sans-serif",
+                flex: 1, padding: "12px 20px", borderRadius: 50,
+                border: `1px solid ${borderColor}`,
+                background: inputBg,
+                color: aiBubbleText, fontSize: 14, outline: "none",
+                fontFamily: "'Nunito',sans-serif",
               }}
             />
-            {/* Send button — teal in dark, orange in light */}
-            <button onClick={sendMessage} style={{
-              width: 48, height: 48, borderRadius: "50%",
-              background: t.accent,
-              border: "none", display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: "pointer", flexShrink: 0, boxShadow: t.btnShadow,
-              transition: "all 0.2s",
-            }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = t.accentHover; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = t.accent; }}
+            <button
+              onClick={sendMessage}
+              disabled={!input.trim() || isTyping}
+              style={{
+                width: 44, height: 44, borderRadius: "50%",
+                background: !input.trim() || isTyping ? "#D4CFC9" : t.accent,
+                border: "none", display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: !input.trim() || isTyping ? 'not-allowed' : "pointer",
+                flexShrink: 0, transition: "all 0.2s",
+              }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
               </svg>
             </button>
           </div>
         </div>
-      </div>
 
+      </div>
       <style>{`@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}`}</style>
     </div>
   );

@@ -16,16 +16,6 @@ import vlmWorkerUrl from './workers/vlm-worker?worker&url';
 const MODELS: CompactModelDef[] = [
   // LLM — Llama 3.2 1B Instruct (primary)
   {
-    id: 'llama-3.2-1b-instruct-q4_k_m',
-    name: 'Llama 3.2 1B Instruct',
-    repo: 'bartowski/Llama-3.2-1B-Instruct-GGUF',
-    files: ['Llama-3.2-1B-Instruct-Q4_K_M.gguf'],
-    framework: LLMFramework.LlamaCpp,
-    modality: ModelCategory.Language,
-    memoryRequirement: 808_000_000,
-  },
-  // LLM — LFM2 350M (fallback)
-  {
     id: 'lfm2-350m-q4_k_m',
     name: 'LFM2 350M Q4_K_M',
     repo: 'LiquidAI/LFM2-350M-GGUF',
@@ -33,6 +23,15 @@ const MODELS: CompactModelDef[] = [
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Language,
     memoryRequirement: 250_000_000,
+  },
+  {
+    id: 'llama-3.2-1b-instruct-q4_k_m',
+    name: 'Llama 3.2 1B Instruct',
+    repo: 'bartowski/Llama-3.2-1B-Instruct-GGUF',
+    files: ['Llama-3.2-1B-Instruct-Q4_K_M.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 808_000_000,
   },
   // LLM — LFM2 1.2B Tool
   {

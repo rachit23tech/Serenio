@@ -1,11 +1,11 @@
 /**
  * HistoryContext.tsx
- * Stores session history (voice + chat) and mood log in memory.
+ * Stores session history (voice + chat) and mood log in localStorage.
  * No backend, no auth — fully private, on-device only.
  * Usage: const { sessions, addSession, moodLog, logMood } = useHistory();
  */
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
 export type MoodLevel = "struggling" | "low" | "okay" | "good" | "great";
 
@@ -31,47 +31,62 @@ interface HistoryContextType {
   clearHistory: () => void;
 }
 
-const SEED_SESSIONS: SessionEntry[] = [
-  {
-    id: "1", type: "chat", date: new Date("2026-03-21T14:45:00"), mood: "okay",
-    userText: "I've been feeling a bit overwhelmed with work lately, but I'm trying to take things one step at a time.",
-    serenioResponse: "That's a really healthy approach. Breaking things down into manageable steps can make even the biggest challenges feel more achievable. Remember to celebrate the small victories along the way.",
-  },
-  {
-    id: "2", type: "voice", date: new Date("2026-03-20T09:30:00"), mood: "good",
-    userText: "Had a great morning! Went for a walk and the weather was perfect.",
-    serenioResponse: "That sounds wonderful! Starting your day with movement and fresh air is such a positive way to set the tone. How does it make you feel when you connect with nature?",
-  },
-  {
-    id: "3", type: "chat", date: new Date("2026-03-19T20:10:00"), mood: "low",
-    userText: "Couldn't sleep well last night. Mind was racing with thoughts.",
-    serenioResponse: "I'm sorry to hear that. Racing thoughts at night can be exhausting. Have you tried any grounding techniques before bed, like slow breathing or writing down your worries?",
-  },
-];
-
-const SEED_MOOD_LOG: MoodEntry[] = [
-  { date: new Date("2026-03-15"), mood: "good"  },
-  { date: new Date("2026-03-16"), mood: "great" },
-  { date: new Date("2026-03-17"), mood: "okay"  },
-  { date: new Date("2026-03-18"), mood: "good"  },
-  { date: new Date("2026-03-19"), mood: "low"   },
-];
-
 const HistoryContext = createContext<HistoryContextType>({
   sessions: [], addSession: () => {}, moodLog: [], logMood: () => {}, clearHistory: () => {},
 });
 
+// Helper to parse dates back from JSON
+function parseSessions(raw: string): SessionEntry[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.map((s: any) => ({ ...s, date: new Date(s.date) }));
+  } catch { return []; }
+}
+
+function parseMoodLog(raw: string): MoodEntry[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed.map((m: any) => ({ ...m, date: new Date(m.date) }));
+  } catch { return []; }
+}
+
 export function HistoryProvider({ children }: { children: ReactNode }) {
-  const [sessions, setSessions] = useState<SessionEntry[]>(SEED_SESSIONS);
-  const [moodLog, setMoodLog] = useState<MoodEntry[]>(SEED_MOOD_LOG);
+  const [sessions, setSessions] = useState<SessionEntry[]>(() => {
+    const saved = localStorage.getItem('serenio-sessions');
+    return saved ? parseSessions(saved) : [];
+  });
 
-  const addSession = (entry: Omit<SessionEntry, "id">) =>
-    setSessions((prev) => [{ ...entry, id: Date.now().toString() }, ...prev]);
+  const [moodLog, setMoodLog] = useState<MoodEntry[]>(() => {
+    const saved = localStorage.getItem('serenio-moodlog');
+    return saved ? parseMoodLog(saved) : [];
+  });
 
-  const logMood = (mood: MoodLevel) =>
-    setMoodLog((prev) => [{ date: new Date(), mood }, ...prev]);
+  // Save sessions to localStorage whenever they change
+  useEffect(() => {
+    localStorage.setItem('serenio-sessions', JSON.stringify(sessions));
+  }, [sessions]);
 
-  const clearHistory = () => { setSessions([]); setMoodLog([]); };
+  // Save mood log to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('serenio-moodlog', JSON.stringify(moodLog));
+  }, [moodLog]);
+
+  const addSession = (entry: Omit<SessionEntry, "id">) => {
+    const newEntry = { ...entry, id: Date.now().toString() };
+    setSessions((prev) => [newEntry, ...prev]);
+  };
+
+  const logMood = (mood: MoodLevel) => {
+    const newEntry = { date: new Date(), mood };
+    setMoodLog((prev) => [newEntry, ...prev]);
+  };
+
+  const clearHistory = () => {
+    setSessions([]);
+    setMoodLog([]);
+    localStorage.removeItem('serenio-sessions');
+    localStorage.removeItem('serenio-moodlog');
+  };
 
   return (
     <HistoryContext.Provider value={{ sessions, addSession, moodLog, logMood, clearHistory }}>
