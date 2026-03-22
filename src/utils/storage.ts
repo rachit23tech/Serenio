@@ -28,3 +28,5 @@ export function getMoods() {
 export function clearHistory() {
   localStorage.removeItem('serenio-history');
 }
+
+

@@ -14,7 +14,16 @@ import { ONNX } from '@runanywhere/web-onnx';
 import vlmWorkerUrl from './workers/vlm-worker?worker&url';
 
 const MODELS: CompactModelDef[] = [
-  // LLM — Llama 3.2 1B Instruct (primary)
+  // LLM — Ultra-fast tiny model for maximum speed
+  {
+    id: 'lfm2-350m-q2_k',
+    name: 'LFM2 350M Q2_K (Ultra Fast)',
+    repo: 'LiquidAI/LFM2-350M-GGUF',
+    files: ['LFM2-350M-Q2_K.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 150_000_000, // ~40% smaller than Q4
+  },
   {
     id: 'lfm2-350m-q4_k_m',
     name: 'LFM2 350M Q4_K_M',
@@ -23,6 +32,16 @@ const MODELS: CompactModelDef[] = [
     framework: LLMFramework.LlamaCpp,
     modality: ModelCategory.Language,
     memoryRequirement: 250_000_000,
+  },
+  // LLM — quality / stability balance for local chat
+  {
+    id: 'qwen2.5-0.5b-instruct-q4_k_m',
+    name: 'Qwen2.5 0.5B Instruct Q4_K_M',
+    repo: 'bartowski/Qwen2.5-0.5B-Instruct-GGUF',
+    files: ['Qwen2.5-0.5B-Instruct-Q4_K_M.gguf'],
+    framework: LLMFramework.LlamaCpp,
+    modality: ModelCategory.Language,
+    memoryRequirement: 430_000_000,
   },
   {
     id: 'llama-3.2-1b-instruct-q4_k_m',
@@ -85,6 +104,32 @@ const MODELS: CompactModelDef[] = [
   },
 ];
 
+export const PREFERRED_MODEL_IDS: Partial<Record<ModelCategory, string>> = {
+  [ModelCategory.Language]: 'llama-3.2-1b-instruct-q4_k_m', // Best balance: fast + smart + understands instructions
+  [ModelCategory.Multimodal]: 'lfm2-vl-450m-q4_0',
+  [ModelCategory.SpeechRecognition]: 'sherpa-onnx-whisper-tiny.en',
+  [ModelCategory.SpeechSynthesis]: 'vits-piper-en_US-lessac-medium',
+  [ModelCategory.Audio]: 'silero-vad-v5',
+};
+
+export const MODEL_FALLBACK_ORDER: Partial<Record<ModelCategory, string[]>> = {
+  [ModelCategory.Language]: [
+    'llama-3.2-1b-instruct-q4_k_m', // Best: understands context, reasonably fast
+    'lfm2-350m-q4_k_m', // Backup: smaller/faster
+  ],
+  [ModelCategory.Multimodal]: ['lfm2-vl-450m-q4_0'],
+  [ModelCategory.SpeechRecognition]: ['sherpa-onnx-whisper-tiny.en'],
+  [ModelCategory.SpeechSynthesis]: ['vits-piper-en_US-lessac-medium'],
+  [ModelCategory.Audio]: ['silero-vad-v5'],
+};
+
+export const OFFLINE_MODEL_PACK = [
+  'llama-3.2-1b-instruct-q4_k_m', // Best balance of speed and comprehension
+  PREFERRED_MODEL_IDS[ModelCategory.SpeechRecognition],
+  PREFERRED_MODEL_IDS[ModelCategory.SpeechSynthesis],
+  PREFERRED_MODEL_IDS[ModelCategory.Audio],
+].filter((value, index, array): value is string => Boolean(value) && array.indexOf(value) === index);
+
 let _initPromise: Promise<void> | null = null;
 
 export async function initSDK(): Promise<void> {
@@ -93,7 +138,7 @@ export async function initSDK(): Promise<void> {
   _initPromise = (async () => {
     await RunAnywhere.initialize({
       environment: SDKEnvironment.Development,
-      debug: true,
+      debug: false, // Disable debug logging for better performance
     });
 
     await LlamaCPP.register();
@@ -118,3 +163,5 @@ export function getAccelerationMode(): string | null {
 }
 
 export { RunAnywhere, ModelManager, ModelCategory, VLMWorkerBridge };
+
+

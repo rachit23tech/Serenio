@@ -25,7 +25,7 @@ export default function Landing() {
       display: "flex", flexDirection: "column",
       alignItems: "center", justifyContent: "center",
       padding: "48px 24px", position: "relative", overflow: "hidden",
-      fontFamily: "'Nunito', sans-serif",
+      fontFamily: "var(--font-sans)",
     }}>
 
       {/* Background ambient blobs */}
@@ -131,7 +131,7 @@ export default function Landing() {
             padding: "17px 32px", borderRadius: 50,
             fontSize: 16, fontWeight: 600, color: "#FFFFFF",
             border: "none", cursor: "pointer",
-            fontFamily: "'Nunito', sans-serif",
+            fontFamily: "var(--font-sans)",
             // Dark = periwinkle→teal gradient (Image 1)
             // Light = solid orange
             background: dark
@@ -160,7 +160,7 @@ export default function Landing() {
           style={{
             background: "none", border: "none", cursor: "pointer",
             fontSize: 14, color: t.textMuted,
-            fontFamily: "'Nunito', sans-serif",
+            fontFamily: "var(--font-sans)",
             display: "block", margin: "0 auto 28px",
           }}
         >
@@ -192,3 +192,5 @@ export default function Landing() {
     </div>
   );
 }
+
+

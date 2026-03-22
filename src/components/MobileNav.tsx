@@ -38,7 +38,7 @@ export default function MobileNav({ t }: MobileNavProps) {
           style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
             fontSize: 11, color: t.textMuted, background: "none", border: "none",
-            cursor: "pointer", fontFamily: "'Nunito', sans-serif",
+            cursor: "pointer", fontFamily: "var(--font-sans)",
           }}
         >
           <span style={{ fontSize: 20 }}>{item.icon}</span>
@@ -48,3 +48,5 @@ export default function MobileNav({ t }: MobileNavProps) {
     </nav>
   );
 }
+
+

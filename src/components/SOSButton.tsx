@@ -32,7 +32,7 @@ export default function SOSButton() {
           display: "flex", alignItems: "center", justifyContent: "center",
           boxShadow: "0 4px 20px rgba(239,68,68,0.5)",
           fontSize: 20, color: "white", fontWeight: 700,
-          fontFamily: "'Nunito',sans-serif",
+          fontFamily: "var(--font-sans)",
           transition: "transform 0.2s",
         }}
         onMouseEnter={e => (e.currentTarget.style.transform = "scale(1.1)")}
@@ -67,13 +67,13 @@ export default function SOSButton() {
               <p style={{ fontSize: 36, margin: "0 0 8px" }}>💙</p>
               <h2 style={{
                 fontSize: 20, fontWeight: 700, color: t.textPrimary,
-                margin: "0 0 8px", fontFamily: "'Nunito',sans-serif",
+                margin: "0 0 8px", fontFamily: "var(--font-sans)",
               }}>
                 You are not alone
               </h2>
               <p style={{
                 fontSize: 14, color: t.textMuted, margin: 0,
-                fontFamily: "'Nunito',sans-serif", lineHeight: 1.6,
+                fontFamily: "var(--font-sans)", lineHeight: 1.6,
               }}>
                 Reach out to a trained counselor right now. It's free and confidential.
               </p>
@@ -96,13 +96,13 @@ export default function SOSButton() {
                   <div>
                     <p style={{
                       fontSize: 14, fontWeight: 700, color: "#DC2626",
-                      margin: "0 0 2px", fontFamily: "'Nunito',sans-serif",
+                      margin: "0 0 2px", fontFamily: "var(--font-sans)",
                     }}>
                       {h.name}
                     </p>
                     <p style={{
                       fontSize: 12, color: t.textMuted, margin: 0,
-                      fontFamily: "'Nunito',sans-serif",
+                      fontFamily: "var(--font-sans)",
                     }}>
                       {h.desc}
                     </p>
@@ -110,7 +110,7 @@ export default function SOSButton() {
                   <div style={{ textAlign: "right" }}>
                     <p style={{
                       fontSize: 15, fontWeight: 700, color: "#DC2626",
-                      margin: 0, fontFamily: "'Nunito',sans-serif",
+                      margin: 0, fontFamily: "var(--font-sans)",
                     }}>
                       📞 {h.number}
                     </p>
@@ -126,7 +126,7 @@ export default function SOSButton() {
                 width: "100%", padding: "12px", borderRadius: 50,
                 background: t.bg, border: `1px solid ${t.border}`,
                 color: t.textMuted, fontSize: 14, fontWeight: 600,
-                cursor: "pointer", fontFamily: "'Nunito',sans-serif",
+                cursor: "pointer", fontFamily: "var(--font-sans)",
               }}
             >
               I'm okay, close this
@@ -137,3 +137,5 @@ export default function SOSButton() {
     </>
   );
 }
+
+

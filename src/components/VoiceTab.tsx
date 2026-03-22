@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { VoicePipeline, ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
 import { VAD } from '@runanywhere/web-onnx';
 import { useModelLoader } from '../hooks/useModelLoader';
+import { usePrivateMode } from '../context/PrivateModeContext';
+import { PrivateModeToggleCompact } from './PrivateModeToggle';
 import { ModelBanner } from './ModelBanner';
 
 type VoiceState = 'idle' | 'loading-models' | 'listening' | 'processing' | 'speaking';
@@ -39,6 +41,7 @@ export function VoiceTab() {
   const sttLoader = useModelLoader(ModelCategory.SpeechRecognition, true);
   const ttsLoader = useModelLoader(ModelCategory.SpeechSynthesis, true);
   const vadLoader = useModelLoader(ModelCategory.Audio, true);
+  const { isPrivateMode } = usePrivateMode();
 
   const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -81,6 +84,9 @@ export function VoiceTab() {
   }, [vadLoader, sttLoader, llmLoader, ttsLoader]);
 
   const saveToHistory = (userSaid: string, serenioSaid: string) => {
+    // Skip saving if in private mode
+    if (isPrivateMode) return;
+    
     const entry = {
       time: new Date().toLocaleString(),
       userSaid,
@@ -150,63 +156,67 @@ export function VoiceTab() {
     crisisDetected.current = false;
 
     try {
-      const result = await pipeline.processTurn(audioData, {
-        maxTokens: 35,
-        temperature: 0.7,
-        systemPrompt: SYSTEM_PROMPT,
-      }, {
-        onTranscription: (text) => {
-          setTranscript(text);
-          // Detect crisis immediately after transcription
-          if (isCrisis(text)) {
-            crisisDetected.current = true;
-            setResponse(CRISIS_RESPONSE);
-            saveToHistory(text, CRISIS_RESPONSE);
-            setChatHistory(prev => [
-              ...prev,
-              { role: 'user', content: text },
-              { role: 'assistant', content: CRISIS_RESPONSE },
-            ]);
-          }
-        },
-        onResponseToken: (_token, accumulated) => {
-          // Don't override crisis response
-          if (!crisisDetected.current) {
-            setResponse(accumulated);
-          }
-        },
-        onResponseComplete: (text) => {
-          // Don't override crisis response
-          if (!crisisDetected.current) {
-            setResponse(text);
-          }
-        },
-        onSynthesisComplete: async (audio, sampleRate) => {
-          // Don't play TTS if crisis — too cold for crisis situation
-          if (!crisisDetected.current) {
-            setVoiceState('speaking');
-            const player = new AudioPlayback({ sampleRate });
-            await player.play(audio, sampleRate);
-            player.dispose();
-          }
-        },
-        onStateChange: (s) => {
-          if (s === 'processingSTT') setVoiceState('processing');
-          if (s === 'generatingResponse') setVoiceState('processing');
-          if (s === 'playingTTS' && !crisisDetected.current) setVoiceState('speaking');
-        },
-      });
+       const result = await pipeline.processTurn(audioData, {
+         maxTokens: 35,
+         temperature: 0.7,
+         systemPrompt: SYSTEM_PROMPT,
+       }, {
+         onTranscription: (text) => {
+           setTranscript(text);
+           // Detect crisis immediately after transcription
+           if (isCrisis(text)) {
+             crisisDetected.current = true;
+             setResponse(CRISIS_RESPONSE);
+             saveToHistory(text, CRISIS_RESPONSE);
+             if (!isPrivateMode) {
+               setChatHistory(prev => [
+                 ...prev,
+                 { role: 'user', content: text },
+                 { role: 'assistant', content: CRISIS_RESPONSE },
+               ]);
+             }
+           }
+         },
+         onResponseToken: (_token, accumulated) => {
+           // Don't override crisis response
+           if (!crisisDetected.current) {
+             setResponse(accumulated);
+           }
+         },
+         onResponseComplete: (text) => {
+           // Don't override crisis response
+           if (!crisisDetected.current) {
+             setResponse(text);
+           }
+         },
+         onSynthesisComplete: async (audio, sampleRate) => {
+           // Don't play TTS if crisis — too cold for crisis situation
+           if (!crisisDetected.current) {
+             setVoiceState('speaking');
+             const player = new AudioPlayback({ sampleRate });
+             await player.play(audio, sampleRate);
+             player.dispose();
+           }
+         },
+         onStateChange: (s) => {
+           if (s === 'processingSTT') setVoiceState('processing');
+           if (s === 'generatingResponse') setVoiceState('processing');
+           if (s === 'playingTTS' && !crisisDetected.current) setVoiceState('speaking');
+         },
+       });
 
-      if (result && !crisisDetected.current) {
-        setTranscript(result.transcription);
-        setResponse(result.response);
-        setChatHistory(prev => [
-          ...prev,
-          { role: 'user', content: result.transcription },
-          { role: 'assistant', content: result.response },
-        ]);
-        saveToHistory(result.transcription, result.response);
-      }
+       if (result && !crisisDetected.current) {
+         setTranscript(result.transcription);
+         setResponse(result.response);
+         if (!isPrivateMode) {
+           setChatHistory(prev => [
+             ...prev,
+             { role: 'user', content: result.transcription },
+             { role: 'assistant', content: result.response },
+           ]);
+         }
+         saveToHistory(result.transcription, result.response);
+       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -231,6 +241,11 @@ export function VoiceTab() {
 
   return (
     <div className="tab-panel voice-panel">
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+        <div style={{ flex: 1 }} />
+        <PrivateModeToggleCompact />
+      </div>
+
       {pendingLoaders.length > 0 && voiceState === 'idle' && (
         <ModelBanner
           state={pendingLoaders[0].loader.state}
@@ -314,3 +329,5 @@ export function VoiceTab() {
     </div>
   );
 }
+
+

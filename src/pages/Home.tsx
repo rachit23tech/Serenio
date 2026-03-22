@@ -4,40 +4,29 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import { useTheme } from "../context/ThemeContext";
 import { useHistory } from "../context/HistoryContext";
+import { useModelCache } from "../context/ModelCacheContext";
+import { usePrivateMode } from "../context/PrivateModeContext";
+import { PrivateModeToggleCompact } from "../components/PrivateModeToggle";
 import { getTheme } from "../tokens";
-import { VoicePipeline, ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
-import { VAD } from '@runanywhere/web-onnx';
+import { ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
+import { STT, TTS, VAD } from '@runanywhere/web-onnx';
 import { useModelLoader } from '../hooks/useModelLoader';
+import {
+  CRISIS_RESPONSE,
+  FAST_TEMPERATURE,
+  FAST_VOICE_MAX_TOKENS,
+  HELPLINE_NOTE,
+  detectMoodFromText,
+  generateCompanionReply,
+  isCrisisText,
+  sanitizeCompanionReply,
+} from '../lib/companion';
 
 type VoiceState = "idle" | "loading-models" | "listening" | "processing" | "responding";
-
-const CRISIS_KEYWORDS = ['kill myself', 'killing myself', 'suicide', 'end my life', 'self harm', 'hurt myself', 'want to die'];
-const CRISIS_RESPONSE = "You matter so much. Please call iCall at 9152987821 right now. I'm here with you.";
-
-const SYSTEM_PROMPT = `You are Serenio. You ONLY respond like a caring close friend texting someone.
-
-STRICT OUTPUT RULES:
-- Maximum 1-2 sentences ONLY. Never more.
-- No lists. No bullets. No headers. No bold.
-- No formal language. No clinical words.
-- Never start with "I understand" or "I hear you"
-- Never give unsolicited advice
-- Always ask ONE gentle follow up question
-- Sound like a 25 year old friend texting
-
-BAD response example:
-"I understand you're feeling anxious. Here are some strategies: 1) Deep breathing 2) Meditation"
-
-GOOD response example:
-"That sounds really overwhelming. How long has it been feeling this way?"
-
-ANOTHER GOOD example:
-"Honestly that makes so much sense. What's been the hardest part of your day?"
-
-Remember: Short. Warm. Curious. Friend. NOT therapist.`;
 
 function getOrbStyle(state: VoiceState, dark: boolean) {
   if (dark) {
@@ -59,11 +48,13 @@ function getOrbStyle(state: VoiceState, dark: boolean) {
 }
 
 export default function Home() {
+  const navigate = useNavigate();
   const { dark } = useTheme();
   const t = getTheme(dark);
   const { addSession } = useHistory();
+  const { cacheState, online, packReady, progress, statusText, voiceReady } = useModelCache();
+  const { isPrivateMode } = usePrivateMode();
 
-  const llmLoader = useModelLoader(ModelCategory.Language, true);
   const sttLoader = useModelLoader(ModelCategory.SpeechRecognition, true);
   const ttsLoader = useModelLoader(ModelCategory.SpeechSynthesis, true);
   const vadLoader = useModelLoader(ModelCategory.Audio, true);
@@ -73,9 +64,9 @@ export default function Home() {
   const [responseText, setResponseText] = useState("");
   const [orbScale, setOrbScale] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
 
   const micRef = useRef<AudioCapture | null>(null);
-  const pipelineRef = useRef<VoicePipeline | null>(null);
   const vadUnsub = useRef<(() => void) | null>(null);
   const crisisDetected = useRef(false);
 
@@ -93,101 +84,127 @@ export default function Home() {
     };
   }, []);
 
-  const isCrisis = (text: string) =>
-    CRISIS_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
-
-  const saveToHistory = (userSaid: string, serenioSaid: string) => {
-    const entry = {
-      time: new Date().toLocaleString(),
-      userSaid,
-      serenioSaid,
-      mood: null,
-    };
-    const existing = JSON.parse(localStorage.getItem('serenio-history') || '[]');
-    existing.unshift(entry);
-    localStorage.setItem('serenio-history', JSON.stringify(existing));
-  };
+   const saveToHistory = (userSaid: string, serenioSaid: string) => {
+     // Skip saving if in private mode
+     if (isPrivateMode) return;
+     
+     const entry = {
+       time: new Date().toLocaleString(),
+       userSaid,
+       serenioSaid,
+       mood: null,
+     };
+     const existing = JSON.parse(localStorage.getItem('serenio-history') || '[]');
+     existing.unshift(entry);
+     localStorage.setItem('serenio-history', JSON.stringify(existing));
+   };
 
   const ensureModels = async (): Promise<boolean> => {
     setVoiceState('loading-models');
     setError(null);
-    const results = await Promise.all([
-      vadLoader.ensure(),
-      sttLoader.ensure(),
-      llmLoader.ensure(),
-      ttsLoader.ensure(),
-    ]);
-    if (results.every(Boolean)) {
+    setLoadingDetail(null);
+
+    const steps = [
+      { label: 'Loading voice activity detector...', run: vadLoader.ensure },
+      { label: 'Loading speech recognition...', run: sttLoader.ensure },
+      { label: 'Loading text to speech...', run: ttsLoader.ensure },
+    ];
+
+    for (const step of steps) {
+      setLoadingDetail(step.label);
+      const ok = await step.run();
+      if (!ok) {
+        setLoadingDetail(null);
+        setError(online
+          ? 'Serenio is still caching or loading the voice stack. Give it a moment or use chat meanwhile.'
+          : 'Voice mode needs cached speech models on this device. Connect once online so Serenio can save them.');
+        setVoiceState('idle');
+        return false;
+      }
+    }
+
+    if (
+      ModelManager.getLoadedModel(ModelCategory.Audio)
+      && ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
+      && ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis)
+    ) {
+      setLoadingDetail(null);
+      setError(null);
       setVoiceState('idle');
       return true;
     }
-    setError('Failed to load voice models');
+
+    setLoadingDetail(null);
+    setError('Voice stack did not finish loading cleanly. Try once more.');
     setVoiceState('idle');
     return false;
   };
 
   const processSpeech = useCallback(async (audioData: Float32Array) => {
-    const pipeline = pipelineRef.current;
-    if (!pipeline) return;
-
     micRef.current?.stop();
     vadUnsub.current?.();
     setVoiceState('processing');
     crisisDetected.current = false;
 
     try {
-      const result = await pipeline.processTurn(audioData, {
-        maxTokens: 35,
-        temperature: 0.7,
-        systemPrompt: SYSTEM_PROMPT,
-      }, {
-        onTranscription: (text) => {
-          setTranscript(text);
-          if (isCrisis(text)) {
-            crisisDetected.current = true;
-            setResponseText(CRISIS_RESPONSE);
-            saveToHistory(text, CRISIS_RESPONSE);
-          }
-        },
-        onResponseToken: (_token, accumulated) => {
-          if (!crisisDetected.current) setResponseText(accumulated);
-        },
-        onResponseComplete: (text) => {
-          if (!crisisDetected.current) setResponseText(text);
-        },
-        onSynthesisComplete: async (audio, sampleRate) => {
-          if (!crisisDetected.current) {
-            setVoiceState('responding');
-            const player = new AudioPlayback({ sampleRate });
-            await player.play(audio, sampleRate);
-            player.dispose();
-          }
-        },
-        onStateChange: (s) => {
-          if (s === 'processingSTT') setVoiceState('processing');
-          if (s === 'generatingResponse') setVoiceState('processing');
-          if (s === 'playingTTS' && !crisisDetected.current) setVoiceState('responding');
-        },
-      });
+      const sttResult = await STT.transcribe(audioData, { sampleRate: 16000 });
+      const transcription = sttResult.text.trim();
+      setTranscript(transcription);
 
-      if (result && !crisisDetected.current) {
-        setTranscript(result.transcription);
-        setResponseText(result.response);
-        saveToHistory(result.transcription, result.response);
-        addSession({
-          type: 'voice',
-          date: new Date(),
-          mood: 'okay',
-          userText: result.transcription,
-          serenioResponse: result.response,
-        });
+      if (!transcription) {
+        setVoiceState('idle');
+        return;
+      }
+
+      let cleanResponse = '';
+
+       if (isCrisisText(transcription)) {
+         crisisDetected.current = true;
+         cleanResponse = `${CRISIS_RESPONSE} ${HELPLINE_NOTE}`;
+         setResponseText(cleanResponse);
+         saveToHistory(transcription, cleanResponse);
+         if (!isPrivateMode) {
+           addSession({
+             type: 'voice',
+             date: new Date(),
+             mood: 'struggling',
+             userText: transcription,
+             serenioResponse: cleanResponse,
+           });
+         }
+       } else {
+         const reply = await generateCompanionReply(transcription, {
+           maxTokens: FAST_VOICE_MAX_TOKENS,
+           temperature: FAST_TEMPERATURE,
+           stream: false,
+         });
+         cleanResponse = sanitizeCompanionReply(reply.text, transcription);
+         setResponseText(cleanResponse);
+         saveToHistory(transcription, cleanResponse);
+         if (!isPrivateMode) {
+           addSession({
+             type: 'voice',
+             date: new Date(),
+             mood: detectMoodFromText(transcription),
+             userText: transcription,
+             serenioResponse: cleanResponse,
+           });
+         }
+       }
+
+      if (cleanResponse && TTS.isVoiceLoaded) {
+        setVoiceState('responding');
+        const speech = await TTS.synthesize(cleanResponse, { speed: 1.0 });
+        const player = new AudioPlayback({ sampleRate: speech.sampleRate });
+        await player.play(speech.audioData, speech.sampleRate);
+        player.dispose();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
 
-    setVoiceState('idle');
-  }, [addSession]);
+     setVoiceState('idle');
+   }, [addSession, isPrivateMode]);
 
   const handleOrbClick = async () => {
     // If already active — stop
@@ -203,11 +220,11 @@ export default function Home() {
     setTranscript('');
     setResponseText('');
     setError(null);
+    setLoadingDetail(null);
     crisisDetected.current = false;
 
     const anyMissing = !ModelManager.getLoadedModel(ModelCategory.Audio)
       || !ModelManager.getLoadedModel(ModelCategory.SpeechRecognition)
-      || !ModelManager.getLoadedModel(ModelCategory.Language)
       || !ModelManager.getLoadedModel(ModelCategory.SpeechSynthesis);
 
     if (anyMissing) {
@@ -219,10 +236,6 @@ export default function Home() {
 
     const mic = new AudioCapture({ sampleRate: 16000 });
     micRef.current = mic;
-
-    if (!pipelineRef.current) {
-      pipelineRef.current = new VoicePipeline();
-    }
 
     VAD.reset();
 
@@ -268,10 +281,55 @@ export default function Home() {
             position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
             borderRadius: 8, padding: '10px 20px', color: '#fca5a5', fontSize: 13, zIndex: 10,
+            display: 'flex', alignItems: 'center', gap: 12,
           }}>
-            ⚠️ {error}
+            <span>⚠️ {error}</span>
+            <button
+              onClick={() => navigate('/session')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: '1px solid rgba(255,255,255,0.2)',
+                background: 'rgba(255,255,255,0.06)',
+                color: '#fff',
+                cursor: 'pointer',
+                fontSize: 12,
+              }}
+            >
+              Open chat
+            </button>
           </div>
         )}
+
+        {!error && (
+          <div style={{
+            position: 'absolute', top: 24, left: '50%', transform: 'translateX(-50%)',
+            background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.72)',
+            border: `1px solid ${t.border}`,
+            borderRadius: 999, padding: '10px 18px', color: t.textMuted, fontSize: 13, zIndex: 10,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <span>
+              {voiceState === 'loading-models' && loadingDetail
+                ? loadingDetail
+                : voiceReady
+                ? 'Offline voice pack ready'
+                : cacheState === 'downloading'
+                  ? `${statusText} ${Math.round(progress * 100)}%`
+                  : packReady
+                    ? 'Offline model pack ready'
+                    : statusText}
+            </span>
+          </div>
+        )}
+
+        {/* Private Mode Toggle */}
+        <div style={{
+          position: 'absolute', top: 24, right: 24,
+          zIndex: 10,
+        }}>
+          <PrivateModeToggleCompact />
+        </div>
 
         {/* Outer glow */}
         <div style={{
@@ -317,7 +375,7 @@ export default function Home() {
         <h2 style={{
           fontSize: 20, fontWeight: 600, color: t.textPrimary,
           margin: "0 0 8px", textAlign: "center",
-          zIndex: 1, fontFamily: "'Nunito',sans-serif",
+          zIndex: 1, fontFamily: "var(--font-sans)",
         }}>
           {voiceState === "idle"           && "Hi, I'm Serenio. I'm here to listen."}
           {voiceState === "loading-models" && "Loading models..."}
@@ -328,7 +386,7 @@ export default function Home() {
         <p style={{
           fontSize: 14, color: t.textMuted,
           margin: "0 0 24px", zIndex: 1,
-          fontFamily: "'Nunito',sans-serif",
+          fontFamily: "var(--font-sans)",
         }}>
           {voiceState === "idle"           && "Tap the orb to start speaking"}
           {voiceState === "loading-models" && "Please wait..."}
@@ -345,7 +403,7 @@ export default function Home() {
             padding: "16px 24px", marginBottom: 12,
             border: `1px solid ${t.border}`,
             position: "relative", zIndex: 1,
-            fontFamily: "'Nunito',sans-serif",
+            fontFamily: "var(--font-sans)",
           }}>
             <p style={{ fontSize: 12, color: t.textMuted, fontWeight: 700, margin: "0 0 6px", textTransform: "uppercase", letterSpacing: "0.06em" }}>You shared</p>
             <p style={{ fontSize: 14, color: t.textPrimary, lineHeight: 1.7, margin: 0, fontStyle: 'italic' }}>{transcript}</p>
@@ -361,7 +419,7 @@ export default function Home() {
             border: `1px solid ${t.border}`,
             boxShadow: t.cardShadow,
             position: "relative", zIndex: 1,
-            fontFamily: "'Nunito',sans-serif",
+            fontFamily: "var(--font-sans)",
           }}>
             <p style={{ fontSize: 12, color: t.accent, fontWeight: 700, margin: "0 0 8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Serenio</p>
             <p style={{ fontSize: 14, color: t.textPrimary, lineHeight: 1.7, margin: 0 }}>{responseText}</p>
@@ -402,3 +460,6 @@ export default function Home() {
     </div>
   );
 }
+
+
+
