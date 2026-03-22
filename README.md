@@ -158,7 +158,7 @@ Cross-Origin-Embedder-Policy: credentialless
 
 ## 👥 Team
 
-Built at HackXtreme using the RunAnywhere SDK for fully on-device AI.
+Built at HackXtreme with help of my Teammates Ayush and Somesh using the RunAnywhere SDK for fully on-device AI.
 
 ---
 
