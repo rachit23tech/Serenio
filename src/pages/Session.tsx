@@ -103,7 +103,7 @@ export default function Session() {
       const reply = await generateCompanionReply(userText, {
         maxTokens: FAST_CHAT_MAX_TOKENS,
         temperature: FAST_TEMPERATURE,
-        stream: false,
+        stream: true,
         onToken: (_token, accumulated) => {
           setMessages((prev) =>
             prev.map((message) =>

@@ -34,6 +34,7 @@ import Home    from './pages/Home'
 import Session from './pages/Session'
 import Mood    from './pages/Mood'
 import History from './pages/History'
+import VentingSpace from './pages/VentingSpace'
 import WellnessHub from './pages/WellnessHub'
 import GoalsHub from './pages/GoalsHub'
 import { App } from './App'
@@ -58,6 +59,7 @@ createRoot(document.getElementById('root')!).render(
                       <Route path="/session"   element={<Session />} />
                       <Route path="/mood"      element={<Mood />}    />
                       <Route path="/history"   element={<History />} />
+                      <Route path="/venting"   element={<VentingSpace />} />
                       <Route path="/wellness"  element={<WellnessHub />} />
                       <Route path="/goals"     element={<GoalsHub />} />
                       <Route path="/sdk"       element={<App />}     />

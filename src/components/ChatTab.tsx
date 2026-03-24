@@ -122,13 +122,9 @@ export function ChatTab() {
         .map(m => `${m.role === 'user' ? 'User' : 'Serenio'}: ${m.text}`)
         .join('\n');
 
-      let contextualPrompt = text;
-      if (recentContext && conversationContext.recentMessages.length > 0) {
-        contextualPrompt = `[Recent conversation:\n${recentContext}]\n\nUser: ${text}`;
-      }
-
       // Use optimized companion reply with streaming
-      const result = await generateCompanionReply(contextualPrompt, {
+      const result = await generateCompanionReply(text, {
+        context: recentContext || undefined,
         stream: true,
         onToken: (_token: string, sanitized: string) => {
           setMessages((prev) => {

@@ -1,40 +1,22 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { VoicePipeline, ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
-import { VAD } from '@runanywhere/web-onnx';
+import { ModelCategory, ModelManager, AudioCapture, AudioPlayback, SpeechActivity } from '@runanywhere/web';
+import { STT, TTS, VAD } from '@runanywhere/web-onnx';
 import { useModelLoader } from '../hooks/useModelLoader';
 import { usePrivateMode } from '../context/PrivateModeContext';
 import { PrivateModeToggleCompact } from './PrivateModeToggle';
 import { ModelBanner } from './ModelBanner';
+import {
+  FAST_TEMPERATURE,
+  FAST_VOICE_MAX_TOKENS,
+  HELPLINE_NOTE,
+  generateCompanionReply,
+  isCrisisText,
+  sanitizeCompanionReply,
+} from '../lib/companion';
 
 type VoiceState = 'idle' | 'loading-models' | 'listening' | 'processing' | 'speaking';
 
-const CRISIS_KEYWORDS = ['kill myself', 'killing myself', 'suicide', 'end my life', 'self harm', 'hurt myself', 'want to die'];
 const CRISIS_RESPONSE = "You matter so much. Please call iCall at 9152987821 right now. I'm here with you.";
-
-const SYSTEM_PROMPT = `You are Serenio. You ONLY respond like a caring close friend texting someone.
-
-STRICT OUTPUT RULES:
-- Maximum 1-2 sentences ONLY. Never more.
-- No lists. No bullets. No headers. No bold.
-- No formal language. No clinical words.
-- Never start with "I understand" or "I hear you"
-- Never give unsolicited advice
-- Always ask ONE gentle follow up question
-- Sound like a 25 year old friend texting
-
-BAD response example:
-"I understand you're feeling anxious. Here are some strategies: 1) Deep breathing 2) Meditation"
-
-GOOD response example:
-"That sounds really overwhelming. How long has it been feeling this way?"
-
-ANOTHER GOOD example:
-"Honestly that makes so much sense. What's been the hardest part of your day?"
-
-ANOTHER GOOD example:
-"You don't have to have it all figured out. What happened?"
-
-Remember: Short. Warm. Curious. Friend. NOT therapist.`;
 
 export function VoiceTab() {
   const llmLoader = useModelLoader(ModelCategory.Language, true);
@@ -52,7 +34,6 @@ export function VoiceTab() {
   const crisisDetected = useRef(false);
 
   const micRef = useRef<AudioCapture | null>(null);
-  const pipelineRef = useRef<VoicePipeline | null>(null);
   const vadUnsub = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -83,10 +64,10 @@ export function VoiceTab() {
     return false;
   }, [vadLoader, sttLoader, llmLoader, ttsLoader]);
 
-  const saveToHistory = (userSaid: string, serenioSaid: string) => {
-    // Skip saving if in private mode
+  // FIX: saveToHistory now correctly reads isPrivateMode from closure
+  const saveToHistory = useCallback((userSaid: string, serenioSaid: string) => {
     if (isPrivateMode) return;
-    
+
     const entry = {
       time: new Date().toLocaleString(),
       userSaid,
@@ -96,10 +77,7 @@ export function VoiceTab() {
     const existing = JSON.parse(localStorage.getItem('serenio-history') || '[]');
     existing.unshift(entry);
     localStorage.setItem('serenio-history', JSON.stringify(existing));
-  };
-
-  const isCrisis = (text: string) =>
-    CRISIS_KEYWORDS.some(kw => text.toLowerCase().includes(kw));
+  }, [isPrivateMode]);
 
   const startListening = useCallback(async () => {
     if (voiceState === 'speaking' || voiceState === 'processing') return;
@@ -123,10 +101,6 @@ export function VoiceTab() {
     const mic = new AudioCapture({ sampleRate: 16000 });
     micRef.current = mic;
 
-    if (!pipelineRef.current) {
-      pipelineRef.current = new VoicePipeline();
-    }
-
     VAD.reset();
 
     vadUnsub.current = VAD.onSpeechActivity((activity) => {
@@ -147,83 +121,64 @@ export function VoiceTab() {
   }, [ensureModels, voiceState]);
 
   const processSpeech = useCallback(async (audioData: Float32Array) => {
-    const pipeline = pipelineRef.current;
-    if (!pipeline) return;
-
     micRef.current?.stop();
     vadUnsub.current?.();
     setVoiceState('processing');
     crisisDetected.current = false;
 
     try {
-       const result = await pipeline.processTurn(audioData, {
-         maxTokens: 35,
-         temperature: 0.7,
-         systemPrompt: SYSTEM_PROMPT,
-       }, {
-         onTranscription: (text) => {
-           setTranscript(text);
-           // Detect crisis immediately after transcription
-           if (isCrisis(text)) {
-             crisisDetected.current = true;
-             setResponse(CRISIS_RESPONSE);
-             saveToHistory(text, CRISIS_RESPONSE);
-             if (!isPrivateMode) {
-               setChatHistory(prev => [
-                 ...prev,
-                 { role: 'user', content: text },
-                 { role: 'assistant', content: CRISIS_RESPONSE },
-               ]);
-             }
-           }
-         },
-         onResponseToken: (_token, accumulated) => {
-           // Don't override crisis response
-           if (!crisisDetected.current) {
-             setResponse(accumulated);
-           }
-         },
-         onResponseComplete: (text) => {
-           // Don't override crisis response
-           if (!crisisDetected.current) {
-             setResponse(text);
-           }
-         },
-         onSynthesisComplete: async (audio, sampleRate) => {
-           // Don't play TTS if crisis — too cold for crisis situation
-           if (!crisisDetected.current) {
-             setVoiceState('speaking');
-             const player = new AudioPlayback({ sampleRate });
-             await player.play(audio, sampleRate);
-             player.dispose();
-           }
-         },
-         onStateChange: (s) => {
-           if (s === 'processingSTT') setVoiceState('processing');
-           if (s === 'generatingResponse') setVoiceState('processing');
-           if (s === 'playingTTS' && !crisisDetected.current) setVoiceState('speaking');
-         },
-       });
+      const sttResult = await STT.transcribe(audioData, { sampleRate: 16000 });
+      const transcription = sttResult.text.trim();
+      setTranscript(transcription);
 
-       if (result && !crisisDetected.current) {
-         setTranscript(result.transcription);
-         setResponse(result.response);
-         if (!isPrivateMode) {
-           setChatHistory(prev => [
-             ...prev,
-             { role: 'user', content: result.transcription },
-             { role: 'assistant', content: result.response },
-           ]);
-         }
-         saveToHistory(result.transcription, result.response);
-       }
+      if (!transcription) {
+        setVoiceState('idle');
+        setAudioLevel(0);
+        return;
+      }
+
+      let finalResponse = '';
+
+      if (isCrisisText(transcription)) {
+        crisisDetected.current = true;
+        finalResponse = `${CRISIS_RESPONSE} ${HELPLINE_NOTE}`;
+      } else {
+        const reply = await generateCompanionReply(transcription, {
+          maxTokens: FAST_VOICE_MAX_TOKENS,
+          temperature: FAST_TEMPERATURE,
+          stream: true,
+          onToken: (_token, accumulated) => {
+            setResponse(accumulated);
+          },
+        });
+        finalResponse = sanitizeCompanionReply(reply.text, transcription);
+      }
+
+      setResponse(finalResponse);
+
+      if (!isPrivateMode) {
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'user', content: transcription },
+          { role: 'assistant', content: finalResponse },
+        ].slice(-20) as Array<{role: 'user' | 'assistant', content: string}>);
+      }
+      saveToHistory(transcription, finalResponse);
+
+      if (finalResponse && TTS.isVoiceLoaded) {
+        setVoiceState('speaking');
+        const speech = await TTS.synthesize(finalResponse, { speed: 1.0 });
+        const player = new AudioPlayback({ sampleRate: speech.sampleRate });
+        await player.play(speech.audioData, speech.sampleRate);
+        player.dispose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
 
     setVoiceState('idle');
     setAudioLevel(0);
-  }, []);
+  }, [isPrivateMode, saveToHistory]);
 
   const stopListening = useCallback(() => {
     micRef.current?.stop();
@@ -329,5 +284,3 @@ export function VoiceTab() {
     </div>
   );
 }
-
-

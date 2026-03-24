@@ -176,7 +176,10 @@ export default function Home() {
          const reply = await generateCompanionReply(transcription, {
            maxTokens: FAST_VOICE_MAX_TOKENS,
            temperature: FAST_TEMPERATURE,
-           stream: false,
+           stream: true,
+           onToken: (_token, accumulated) => {
+             setResponseText(accumulated);
+           },
          });
          cleanResponse = sanitizeCompanionReply(reply.text, transcription);
          setResponseText(cleanResponse);

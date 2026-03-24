@@ -105,7 +105,7 @@ const MODELS: CompactModelDef[] = [
 ];
 
 export const PREFERRED_MODEL_IDS: Partial<Record<ModelCategory, string>> = {
-  [ModelCategory.Language]: 'llama-3.2-1b-instruct-q4_k_m', // Best balance: fast + smart + understands instructions
+  [ModelCategory.Language]: 'lfm2-350m-q2_k', // Fastest option for live voice/demo responsiveness
   [ModelCategory.Multimodal]: 'lfm2-vl-450m-q4_0',
   [ModelCategory.SpeechRecognition]: 'sherpa-onnx-whisper-tiny.en',
   [ModelCategory.SpeechSynthesis]: 'vits-piper-en_US-lessac-medium',
@@ -114,8 +114,10 @@ export const PREFERRED_MODEL_IDS: Partial<Record<ModelCategory, string>> = {
 
 export const MODEL_FALLBACK_ORDER: Partial<Record<ModelCategory, string[]>> = {
   [ModelCategory.Language]: [
-    'llama-3.2-1b-instruct-q4_k_m', // Best: understands context, reasonably fast
-    'lfm2-350m-q4_k_m', // Backup: smaller/faster
+    'lfm2-350m-q2_k',
+    'lfm2-350m-q4_k_m',
+    'qwen2.5-0.5b-instruct-q4_k_m',
+    'llama-3.2-1b-instruct-q4_k_m',
   ],
   [ModelCategory.Multimodal]: ['lfm2-vl-450m-q4_0'],
   [ModelCategory.SpeechRecognition]: ['sherpa-onnx-whisper-tiny.en'],
@@ -124,7 +126,7 @@ export const MODEL_FALLBACK_ORDER: Partial<Record<ModelCategory, string[]>> = {
 };
 
 export const OFFLINE_MODEL_PACK = [
-  'llama-3.2-1b-instruct-q4_k_m', // Best balance of speed and comprehension
+  'lfm2-350m-q2_k',
   PREFERRED_MODEL_IDS[ModelCategory.SpeechRecognition],
   PREFERRED_MODEL_IDS[ModelCategory.SpeechSynthesis],
   PREFERRED_MODEL_IDS[ModelCategory.Audio],
