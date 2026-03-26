@@ -81,6 +81,11 @@ export default function Session() {
     };
   }, [cacheState, chatReady, online, progress, statusText]);
 
+  useEffect(() => {
+    if (!chatReady) return;
+    setModelReady(true);
+  }, [chatReady]);
+
   const sendMessage = useCallback(async () => {
     const userText = input.trim();
     if (!userText || isTyping || processingRef.current) return;
@@ -123,12 +128,13 @@ export default function Session() {
          ),
        );
 
-       setModelReady(reply.source === 'model');
-       setStatusLabel(
-         reply.source === 'model'
-           ? 'Offline AI ready on this device'
-           : 'Local fallback mode active until model files are cached',
-       );
+       setModelReady((prev) => prev || reply.source === 'model');
+       setStatusLabel((current) => {
+         if (reply.source === 'model' || chatReady || modelReady) {
+           return 'Offline AI ready on this device';
+         }
+         return current;
+       });
 
        // Only save to history if not in private mode
        if (!isPrivateMode) {

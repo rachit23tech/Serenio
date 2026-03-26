@@ -7,6 +7,7 @@ export const FAST_CHAT_MAX_TOKENS = 24; // Keep text chat snappy for demo use
 export const FAST_VOICE_MAX_TOKENS = 28; // Enough for a useful short spoken reply
 export const FAST_TEMPERATURE = 0.7; // Higher for more natural, less robotic
 const MODEL_REPLY_TIMEOUT_MS = 2500;
+const MODEL_LOAD_TIMEOUT_MS = 1200;
 
 export const CRISIS_KEYWORDS = [
   'kill myself',
@@ -55,7 +56,8 @@ export function detectMoodFromText(text: string): MoodLevel {
 }
 
 export function buildFallbackReply(userText: string): string {
-  const value = userText.toLowerCase();
+  const normalized = normalizeWhitespace(userText);
+  const value = normalized.toLowerCase();
 
   if (isCrisisText(value)) {
     return `${CRISIS_RESPONSE} ${HELPLINE_NOTE}`;
@@ -99,7 +101,13 @@ export function buildFallbackReply(userText: string): string {
   if (/(good|great|better|happy|excited)/.test(value)) {
     return 'I\'m so glad to hear that! That\'s really wonderful.';
   }
-  return 'I\'m here and listening. What\'s going on?';
+
+  const preview = normalized.replace(/[!?.,;:]+$/g, '').slice(0, 80);
+  if (preview) {
+    return `I hear you. Say a little more about "${preview}" so I can stay with the right part.`;
+  }
+
+  return 'I\'m here with you. Tell me what feels most important right now.';
 }
 
 function getInstantCompanionReply(userText: string): string | null {
@@ -242,22 +250,18 @@ export async function generateCompanionReply(
   },
 ): Promise<CompanionReplyResult> {
   const latestUserInput = extractLatestUserInput(userText);
-  const instantReply = getInstantCompanionReply(latestUserInput);
-
-  if (instantReply) {
-    return { text: instantReply, source: 'fallback' };
-  }
 
   if (isCrisisText(latestUserInput)) {
     return { text: `${CRISIS_RESPONSE} ${HELPLINE_NOTE}`, source: 'fallback' };
   }
 
+  const instantReply = getInstantCompanionReply(latestUserInput);
   const ready = await Promise.race<boolean>([
     ensureLanguageModelLoaded(),
-    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 1200)),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), MODEL_LOAD_TIMEOUT_MS)),
   ]);
   if (!ready) {
-    return { text: buildFallbackReply(latestUserInput), source: 'fallback' };
+    return { text: instantReply ?? buildFallbackReply(latestUserInput), source: 'fallback' };
   }
 
   try {
