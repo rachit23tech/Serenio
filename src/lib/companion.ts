@@ -38,7 +38,10 @@ export const COMPANION_SYSTEM_PROMPT = [
 ].join(' ');
 
 function normalizeWhitespace(text: string): string {
-  return text.replace(/\s+/g, ' ').trim();
+  return text
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 export function isCrisisText(text: string): boolean {
@@ -61,6 +64,9 @@ export function buildFallbackReply(userText: string): string {
 
   if (isCrisisText(value)) {
     return `${CRISIS_RESPONSE} ${HELPLINE_NOTE}`;
+  }
+  if (/(motivat|cheer me up|cheer me|pick me up|inspire me|encourag)/.test(value)) {
+    return 'You deserve a reminder that you are stronger than this moment. Keep going one small step at a time — I’m here with you.';
   }
   if (/(what should i do|what do i do|should i|can you help me decide)/.test(value)) {
     return 'Start with the smallest next step that makes you feel a little safer or calmer. What feels most urgent right now?';
@@ -130,6 +136,9 @@ function getInstantCompanionReply(userText: string): string | null {
   }
   if (/(i can't sleep|i cant sleep|not sleeping|insomnia)/.test(value)) {
     return 'That sounds exhausting. Is it more that your mind won\'t slow down, or your body just won\'t settle?';
+  }
+  if (/(motivat|cheer me up|cheer me|pick me up|inspire me|encourag)/.test(value)) {
+    return buildFallbackReply(userText);
   }
   if (/(what should i do|what do i do|how do i calm down|why do i feel like this|what's wrong with me|am i broken)/.test(value)) {
     return buildFallbackReply(userText);

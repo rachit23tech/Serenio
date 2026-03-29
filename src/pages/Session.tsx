@@ -22,6 +22,12 @@ interface Message {
   source?: 'model' | 'fallback';
 }
 
+let nextMessageId = Date.now();
+function getNextMessageId() {
+  nextMessageId += 1;
+  return nextMessageId;
+}
+
 function getTime() {
   return new Date().toLocaleTimeString('en-US', {
     hour: 'numeric',
@@ -92,13 +98,14 @@ export default function Session() {
 
     processingRef.current = true;
     setInput('');
+    const userMsgId = getNextMessageId();
+    const aiMsgId = getNextMessageId();
     setMessages((prev) => [
       ...prev,
-      { id: Date.now(), role: 'user', text: userText, time: getTime() },
+      { id: userMsgId, role: 'user', text: userText, time: getTime() },
     ]);
     setIsTyping(true);
 
-    const aiMsgId = Date.now() + 1;
     setMessages((prev) => [
       ...prev,
       { id: aiMsgId, role: 'ai', text: '', time: getTime(), source: 'fallback' },
