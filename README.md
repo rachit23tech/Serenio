@@ -12,8 +12,11 @@ A voice-first mental health companion web app built with React + TypeScript, pow
 |------|-------------|
 | **Voice** | Speak naturally — Serenio listens, understands, and responds like a caring friend. Full STT → LLM → TTS pipeline runs on-device. |
 | **Chat** | Type your thoughts and get warm, casual responses from Serenio — no cloud, no data leaving your device. |
-| **Mood** | Log your daily mood, get 15 personalized activity suggestions with quotes, and track your 7-day mood history. |
-| **History** | Your private journal — every voice and chat session saved locally on your device only. |
+| **Mood** | Log your daily mood, get personalized activity recommendations, and track your mood trends. |
+| **Journal & History** | Your private journal — every voice and chat session saved locally on your device only. |
+| **Venting Space** | A dedicated non-judgmental space to express raw feelings without unprompted advice. |
+| **Wellness Hub** | Guided CBT/mindfulness exercises and local sleep habit tracking with AI insights. |
+| **Goals Hub** | Gentle habit tracker, medication reminders, and therapy appointment scheduling. |
 
 ---
 
@@ -29,14 +32,15 @@ A voice-first mental health companion web app built with React + TypeScript, pow
 
 ## 🆘 Crisis Support
 
-Serenio automatically detects crisis situations and immediately shows verified Indian mental health helplines:
+Serenio automatically detects crisis situations and immediately shows verified mental health helplines:
 
 | Helpline | Number | Hours |
 |---------|--------|-------|
 | iCall | 9152987821 | Mon–Sat, 8am–10pm |
 | Vandrevala Foundation | 1860-2662-345 | 24/7 |
 | AASRA | 9820466627 | 24/7 |
-| Snehi | 044-24640050 | Mon–Sat, 8am–10pm |
+| Tele-MANAS | 14416 | 24/7 Toll-Free |
+| 988 Lifeline | 988 | 24/7 (US/CA) |
 
 ---
 
@@ -84,39 +88,48 @@ Everything runs locally. Nothing sent to any server.
 
 ```
 src/
-├── main.tsx                  # React root + SDK preload + SOS button
-├── App.tsx                   # Tab navigation fallback
+├── main.tsx                  # React root + routing & providers
 ├── runanywhere.ts            # SDK init + model catalog
 ├── pages/
 │   ├── Landing.tsx           # Splash / welcome screen
-│   ├── Home.tsx              # Voice orb — main experience
-│   ├── Session.tsx           # Chat interface
-│   ├── Mood.tsx              # Mood check-in + activity suggestions
-│   └── History.tsx           # Journal / session history
+│   ├── Home.tsx              # Voice orb — main voice experience
+│   ├── Session.tsx           # Text chat interface
+│   ├── Mood.tsx              # Mood check-in & recommendations
+│   ├── History.tsx           # Journal / session history
+│   ├── VentingSpace.tsx      # Unfiltered private venting space
+│   ├── WellnessHub.tsx       # Guided exercises & sleep tracking
+│   └── GoalsHub.tsx          # Habit tracking, meds, and appointments
 ├── components/
-│   ├── Sidebar.tsx           # Navigation sidebar
-│   ├── SOSButton.tsx         # Always-visible crisis help button
-│   ├── VoiceTab.tsx          # Voice pipeline (fallback)
-│   └── ChatTab.tsx           # Chat (fallback)
+│   ├── Sidebar.tsx           # Navigation sidebar with accessible controls
+│   ├── SOSButton.tsx         # Always-visible emergency helpline modal
+│   ├── NotificationCenter.tsx# Local scheduled notifications
+│   ├── ExerciseModal.tsx     # Step-by-step guided CBT exercise modal
+│   ├── PrivateModeToggle.tsx # Incognito session toggle
+│   ├── VoiceTab.tsx          # On-device voice pipeline component
+│   └── ChatTab.tsx           # On-device text chat component
 ├── context/
-│   ├── ThemeContext.tsx       # Light/dark mode
-│   └── HistoryContext.tsx     # Session + mood persistence (localStorage)
-├── workers/
-│   └── vlm-worker.ts         # VLM Web Worker
-├── hooks/
-│   └── useModelLoader.ts     # Model download/load hook
+│   ├── ThemeContext.tsx      # Dark/light mode theme provider
+│   ├── HistoryContext.tsx    # Local storage session & mood persistence
+│   ├── WellnessContext.tsx   # Comprehensive wellness data store
+│   ├── ModelCacheContext.tsx # Offline model pack management
+│   ├── NotificationContext.tsx# Browser notification scheduler
+│   └── PrivateModeContext.tsx# Private mode state manager
+├── lib/
+│   ├── companion.ts          # Companion prompt & response sanitizer
+│   └── crisisDetection.ts    # Multi-level crisis detection logic
+├── tokens.ts                 # Design tokens (colors, gradients, shadows)
 └── styles/
-    └── index.css             # Global styles + Tailwind
+    └── index.css             # Design system styles & Tailwind setup
 ```
 
 ---
 
 ## 🎨 Design
 
-- **Color palette** — Warm cream `#FDF6EC`, Soft peach `#F4A261`, Sage green `#84A98C`
+- **Color palette** — Warm cream `#FDF6EC`, Muted teal `#68A8A8`, Coral accent `#E8845A`
 - **Typography** — Nunito (calm, friendly, readable)
-- **Theme** — Light mode default, dark mode supported
-- **Feel** — Like a warm hug in app form. Not clinical, not scary.
+- **Theme** — Light mode default, dark mode supported with persistent theme selection
+- **Feel** — A warm, safe space in app form. Empathetic, not clinical.
 
 ---
 
@@ -156,9 +169,9 @@ Cross-Origin-Embedder-Policy: credentialless
 
 ---
 
-## 👥 Team
+## 👤 Author
 
-Built at HackXtreme with help of my Teammates Ayush and Somesh using the RunAnywhere SDK for fully on-device AI.
+Designed and built as a personal project exploring 100% on-device AI for privacy-first mental health companion applications.
 
 ---
 

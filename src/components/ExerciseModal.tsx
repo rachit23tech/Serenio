@@ -1,7 +1,3 @@
-/**
- * ExerciseModal.tsx - Interactive guided exercise modal
- */
-
 import { useState, useEffect } from 'react';
 import { useWellness } from '../context/WellnessContext';
 import { useTheme } from '../context/ThemeContext';

@@ -1,8 +1,3 @@
-/**
- * Home.tsx — Voice orb screen connected to real pipeline
- * Route: /home
- */
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";

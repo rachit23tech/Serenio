@@ -1,8 +1,3 @@
-/**
- * ActivityTimer.tsx - Timer for mood activities
- * Shows countdown and tracks activity progress
- */
-
 import { useState, useEffect } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { getTheme } from '../tokens';

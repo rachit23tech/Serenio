@@ -1,10 +1,3 @@
-/**
- * HistoryContext.tsx
- * Stores session history (voice + chat) and mood log in localStorage.
- * No backend, no auth — fully private, on-device only.
- * Usage: const { sessions, addSession, moodLog, logMood } = useHistory();
- */
-
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
 export type MoodLevel = "struggling" | "low" | "okay" | "good" | "great";
@@ -29,10 +22,11 @@ interface HistoryContextType {
   moodLog: MoodEntry[];
   logMood: (mood: MoodLevel) => void;
   clearHistory: () => void;
+  deleteSession: (id: string) => void;
 }
 
 const HistoryContext = createContext<HistoryContextType>({
-  sessions: [], addSession: () => {}, moodLog: [], logMood: () => {}, clearHistory: () => {},
+  sessions: [], addSession: () => {}, moodLog: [], logMood: () => {}, clearHistory: () => {}, deleteSession: () => {},
 });
 
 // Helper to parse dates back from JSON
@@ -88,8 +82,12 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('serenio-moodlog');
   };
 
+  const deleteSession = (id: string) => {
+    setSessions((prev) => prev.filter((session) => session.id !== id));
+  };
+
   return (
-    <HistoryContext.Provider value={{ sessions, addSession, moodLog, logMood, clearHistory }}>
+    <HistoryContext.Provider value={{ sessions, addSession, moodLog, logMood, clearHistory, deleteSession }}>
       {children}
     </HistoryContext.Provider>
   );

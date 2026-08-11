@@ -1,7 +1,3 @@
-/**
- * copingTools.ts - Comprehensive coping toolkit library
- */
-
 import type { CopingTool, EmotionState } from '../types/wellness';
 
 export const COPING_TOOLS: CopingTool[] = [

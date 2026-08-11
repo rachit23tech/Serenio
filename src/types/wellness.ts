@@ -1,7 +1,3 @@
-/**
- * wellness.ts - Type definitions for comprehensive wellness tracking
- */
-
 export type EmotionState = 
   | 'anxious' 
   | 'sad' 
@@ -80,8 +76,8 @@ export interface SleepEntry {
   wakeTime: string; // "07:00"
   hoursSlept: number;
   quality: 1 | 2 | 3 | 4 | 5; // 1=terrible, 5=excellent
-  caffeineAfterNoon: boolean;
-  screenTimeBeforeBed: boolean;
+  caffeineAfterNoon?: boolean;
+  screenTimeBeforeBed?: boolean;
   notes?: string;
 }
 

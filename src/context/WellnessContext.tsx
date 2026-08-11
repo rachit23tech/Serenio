@@ -1,7 +1,3 @@
-/**
- * WellnessContext.tsx - Comprehensive mental health tracking and support
- */
-
 import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from 'react';
 import type {
   ConversationContext,

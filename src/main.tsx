@@ -1,22 +1,6 @@
-/**
- * main.tsx — App entry point
- * Routes:
- *   /           → Landing (splash)
- *   /home       → Home (voice orb)
- *   /session    → Session (chat)
- *   /mood       → Mood check-in
- *   /history    → Journal history
- *   /venting    → No-judgment venting space
- *   /exercises  → Guided mental health exercises
- *   /wellness   → Sleep & routine tracking
- *   /reminders  → Medications & appointments
- *   /goals      → Gentle accountability tracker
- *   /sdk        → Original RunAnywhere SDK UI
- */
-
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './styles/index.css'
 import { initSDK } from './runanywhere'
 
@@ -37,7 +21,6 @@ import History from './pages/History'
 import VentingSpace from './pages/VentingSpace'
 import WellnessHub from './pages/WellnessHub'
 import GoalsHub from './pages/GoalsHub'
-import { App } from './App'
 
 // Initialize the SDK once at startup.
 // Individual pages decide whether to use cached models or local fallback mode.
@@ -62,7 +45,7 @@ createRoot(document.getElementById('root')!).render(
                       <Route path="/venting"   element={<VentingSpace />} />
                       <Route path="/wellness"  element={<WellnessHub />} />
                       <Route path="/goals"     element={<GoalsHub />} />
-                      <Route path="/sdk"       element={<App />}     />
+                      <Route path="*"          element={<Navigate to="/home" replace />} />
                     </Routes>
                     <SOSButton />
                     <div style={{
@@ -83,6 +66,3 @@ createRoot(document.getElementById('root')!).render(
     </ThemeProvider>
   </StrictMode>
 )
-
-
-

@@ -260,6 +260,8 @@ export default function Session() {
           </div>
 
           <div
+            aria-live="polite"
+            aria-atomic="false"
             style={{
               flex: 1,
               overflowY: 'auto',

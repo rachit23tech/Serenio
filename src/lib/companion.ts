@@ -6,8 +6,10 @@ import { MODEL_FALLBACK_ORDER, PREFERRED_MODEL_IDS } from '../runanywhere';
 export const FAST_CHAT_MAX_TOKENS = 24; // Keep text chat snappy for demo use
 export const FAST_VOICE_MAX_TOKENS = 28; // Enough for a useful short spoken reply
 export const FAST_TEMPERATURE = 0.7; // Higher for more natural, less robotic
-const MODEL_REPLY_TIMEOUT_MS = 2500;
-const MODEL_LOAD_TIMEOUT_MS = 1200;
+const MODEL_REPLY_TIMEOUT_MS = 12000;
+const MODEL_LOAD_TIMEOUT_MS = 12000;
+const MODEL_STREAM_INIT_TIMEOUT_MS = 12000;
+const MODEL_STREAM_TOKEN_TIMEOUT_MS = 12000;
 
 export const CRISIS_KEYWORDS = [
   'kill myself',
@@ -27,8 +29,8 @@ export const CRISIS_RESPONSE = "I'm really glad you said it out loud. Please cal
 export const HELPLINE_NOTE = 'If you are in immediate danger, call your local emergency number now.';
 
 export const COMPANION_SYSTEM_PROMPT = [
-  'You are Serenio, a warm mental health companion who sounds like a caring, emotionally intelligent friend.',
-  'Give direct, relevant answers to the user\'s actual question or concern.',
+  'You are Serenio, a warm mental health friend who listens like a caring roommate and responds with gentle empathy.',
+  'Give direct, relevant answers to the user\'s actual question or concern in a natural, compassionate voice.',
   'If they ask a question, answer it first in plain language, then add gentle emotional support if it fits.',
   'Keep replies short: usually 1-2 sentences, under 45 words total.',
   'Be supportive without sounding clinical, robotic, preachy, or overly generic.',
@@ -80,6 +82,9 @@ export function buildFallbackReply(userText: string): string {
   if (/(what's wrong with me|am i broken|why am i like this)/.test(value)) {
     return 'Nothing is wrong with you for feeling overwhelmed like this. What has been hitting you the hardest?';
   }
+  if (/^(what do you mean|what does that mean|what are you saying|can you explain|can you say that again|what do you mean by that)\??$/.test(value)) {
+    return 'I want to understand you better. Can you tell me a little more about what feels unclear or what you meant?';
+  }
   if (/\?$/.test(value) && /(are you|can you|could you)/.test(value)) {
     return 'I can stay with you and help you think it through gently. What part feels hardest right now?';
   }
@@ -110,7 +115,7 @@ export function buildFallbackReply(userText: string): string {
 
   const preview = normalized.replace(/[!?.,;:]+$/g, '').slice(0, 80);
   if (preview) {
-    return `I hear you. Say a little more about "${preview}" so I can stay with the right part.`;
+    return `I hear you. Can you say a little more about "${preview}" so I can stay with the right part and really help?`;
   }
 
   return 'I\'m here with you. Tell me what feels most important right now.';
@@ -125,8 +130,14 @@ function getInstantCompanionReply(userText: string): string | null {
   if (/(panic attack|having a panic|heart racing|can't breathe|cant breathe)/.test(value)) {
     return 'You\'re safe with me right now. Try one slow inhale and one even slower exhale with me, okay?';
   }
+  if (/(i am not feeling well|i'm not feeling well|not feeling well|i feel awful|i feel terrible|feeling off|feel awful|feel terrible)/.test(value)) {
+    return 'I\'m sorry you\'re feeling this way. Would you like to tell me what part of today feels the hardest?';
+  }
   if (/(i feel anxious|i am anxious|anxiety is bad|overthinking)/.test(value)) {
     return 'That kind of anxiety can feel so loud. What part is spiraling the most right now?';
+  }
+  if (/^(what do you mean|what does that mean|what are you saying|can you explain|can you say that again|what do you mean by that)\??$/.test(value)) {
+    return 'I want to understand you better. Can you tell me a little more about what feels unclear or what you meant?';
   }
   if (/(i feel sad|i am sad|i feel low|i feel empty|i feel numb)/.test(value)) {
     return 'I\'m sorry it feels so heavy right now. Do you want to tell me what pushed today in that direction?';
@@ -148,6 +159,10 @@ function getInstantCompanionReply(userText: string): string | null {
   }
 
   return null;
+}
+
+function isGenericClarifyingQuestion(text: string): boolean {
+  return /^(what do you mean|what does that mean|what are you saying|can you explain|can you say that again|what do you mean by that)/i.test(text.trim());
 }
 
 function compactUserInput(text: string): string {
@@ -297,7 +312,7 @@ export async function generateCompanionReply(
 
     const { stream, result } = await Promise.race([
       TextGeneration.generateStream(prompt, generationOptions),
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('stream timeout')), 1200)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('stream timeout')), MODEL_STREAM_INIT_TIMEOUT_MS)),
     ]);
 
     let accumulated = '';
@@ -310,7 +325,7 @@ export async function generateCompanionReply(
 
     await Promise.race([
       streamLoop,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('token timeout')), MODEL_REPLY_TIMEOUT_MS)),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('token timeout')), MODEL_STREAM_TOKEN_TIMEOUT_MS)),
     ]);
 
     if (!accumulated.trim()) {

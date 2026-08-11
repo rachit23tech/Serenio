@@ -1,7 +1,3 @@
-/**
- * notificationSystem.ts - Browser notification management
- */
-
 export type NotificationType = 
   | 'medication'
   | 'appointment'

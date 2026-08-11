@@ -1,7 +1,3 @@
-/**
- * PrivateModeToggle.tsx - Toggle for incognito/private conversations
- */
-
 import { usePrivateMode } from '../context/PrivateModeContext';
 import { useTheme } from '../context/ThemeContext';
 import { getTheme } from '../tokens';

@@ -1,7 +1,3 @@
-/**
- * crisisDetection.ts - Enhanced Crisis Detection & Immediate Help
- */
-
 import type { CrisisLevel, EmotionState } from '../types/wellness';
 
 // Crisis keywords categorized by severity
@@ -157,28 +153,26 @@ export function detectCrisis(text: string): CrisisDetectionResult {
 function getCrisisMessage(level: 'severe' | 'moderate' | 'mild'): string {
   switch (level) {
     case 'severe':
-      return `🚨 I'm really worried about you right now. This is serious and you deserve immediate help.
+      return `🚨 I'm really worried about you right now. This is serious and you deserve immediate support.
 
-**Please do one of these RIGHT NOW:**
+**Please reach out right now:**
 
-• **Call 988** (Suicide & Crisis Lifeline) - Available 24/7
-• **Text "HELLO" to 741741** (Crisis Text Line)
-• **Call 911** if you're in immediate danger
-• **Go to your nearest emergency room**
+• **Call iCall: 9152987821** (Mon–Sat, 8am–10pm)
+• **Call Vandrevala Foundation: 1860-2662-345** (24/7)
+• **Call AASRA: 9820466627** (24/7)
+• **Call Tele-MANAS: 14416** (24/7 Toll-Free)
+• **Call 988** (US/Canada) or **112 / 911** for emergency services
 
-If you have someone you trust nearby, please tell them what you're feeling right now. Don't go through this alone.
-
-I'm going to stay right here with you. Are you safe right now?`;
+If you have someone you trust nearby, please tell them what you're feeling right now. Don't go through this alone. I'm right here with you. Are you safe right now?`;
 
     case 'moderate':
       return `⚠️ I hear that you're really struggling, and I'm glad you're talking about it. What you're feeling matters.
 
 **Please reach out for support:**
 
-• **Call 988** (Suicide & Crisis Lifeline) - They can help
-• **Text "HELLO" to 741741** (Crisis Text Line)
-• **Contact a trusted friend or family member**
-• **Call your therapist if you have one**
+• **Call iCall: 9152987821** or **Vandrevala Foundation: 1860-2662-345**
+• **Call AASRA: 9820466627** or **Tele-MANAS: 14416**
+• **Contact a trusted friend, family member, or therapist**
 
 You don't have to handle this alone. Can you reach out to someone safe?`;
 
@@ -188,9 +182,9 @@ You don't have to handle this alone. Can you reach out to someone safe?`;
 **Here's what might help:**
 
 • Take a few slow, deep breaths
-• Use the 5-4-3-2-1 grounding technique (check Exercises)
-• Reach out to someone you trust
-• If it gets worse, call 988 or text 741741
+• Try a grounding exercise (check Wellness Hub)
+• Reach out to a trusted friend or helpline
+• If it gets worse, call **9152987821** (iCall) or **988**
 
 I'm here with you. Want to talk about what's happening?`;
 
@@ -206,50 +200,57 @@ export function getCrisisResources() {
   return {
     immediate: [
       {
-        name: '988 Suicide & Crisis Lifeline',
-        description: 'Free, confidential 24/7 support',
+        name: 'iCall Psychosocial Helpline',
+        description: 'Free, confidential support (Mon–Sat, 8am–10pm)',
+        action: 'Call 9152987821',
+        type: 'phone' as const,
+        contact: '9152987821',
+      },
+      {
+        name: 'Vandrevala Foundation',
+        description: '24/7 Mental Health Helpline',
+        action: 'Call 1860-2662-345',
+        type: 'phone' as const,
+        contact: '1860-2662-345',
+      },
+      {
+        name: 'AASRA Crisis Center',
+        description: '24/7 Suicide Prevention Helpline',
+        action: 'Call 9820466627',
+        type: 'phone' as const,
+        contact: '9820466627',
+      },
+      {
+        name: 'Tele-MANAS',
+        description: '24/7 Govt. Mental Health Care Helpline',
+        action: 'Call 14416',
+        type: 'phone' as const,
+        contact: '14416',
+      },
+    ],
+    international: [
+      {
+        name: '988 Suicide & Crisis Lifeline (US/CA)',
+        description: '24/7 Free & Confidential Support',
         action: 'Call 988',
         type: 'phone' as const,
         contact: '988',
       },
       {
-        name: 'Crisis Text Line',
-        description: 'Text-based crisis support 24/7',
-        action: 'Text HELLO to 741741',
-        type: 'text' as const,
-        contact: '741741',
-      },
-      {
-        name: 'Emergency Services',
-        description: 'For immediate danger',
-        action: 'Call 911',
-        type: 'phone' as const,
-        contact: '911',
-      },
-    ],
-    international: [
-      {
-        name: 'International Association for Suicide Prevention',
-        description: 'Crisis centers worldwide',
+        name: 'Befrienders Worldwide',
+        description: 'Find a crisis hotline anywhere in the world',
         action: 'Find your country',
         type: 'web' as const,
-        contact: 'https://www.iasp.info/resources/Crisis_Centres/',
+        contact: 'https://www.befrienders.org/',
       },
     ],
     ongoing: [
       {
-        name: 'NAMI Helpline',
-        description: 'Mental health information and support',
-        action: 'Call 1-800-950-6264',
+        name: 'Snehi Helpline',
+        description: 'Mental health & emotional support',
+        action: 'Call 044-24640050',
         type: 'phone' as const,
-        contact: '1-800-950-6264',
-      },
-      {
-        name: 'SAMHSA National Helpline',
-        description: 'Treatment referral and information',
-        action: 'Call 1-800-662-4357',
-        type: 'phone' as const,
-        contact: '1-800-662-4357',
+        contact: '044-24640050',
       },
     ],
   };

@@ -1,7 +1,3 @@
-/**
- * MoodRecommender.tsx - Enhanced mood-based activity recommender
- */
-
 import { useState, useEffect } from 'react';
 import { useNotifications } from '../context/NotificationContext';
 import { useWellness } from '../context/WellnessContext';

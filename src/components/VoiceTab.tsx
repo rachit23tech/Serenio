@@ -14,6 +14,7 @@ import {
   sanitizeCompanionReply,
 } from '../lib/companion';
 
+
 type VoiceState = 'idle' | 'loading-models' | 'listening' | 'processing' | 'speaking';
 
 const CRISIS_RESPONSE = "You matter so much. Please call iCall at 9152987821 right now. I'm here with you.";
@@ -108,8 +109,6 @@ export function VoiceTab() {
         const segment = VAD.popSpeechSegment();
         if (segment && segment.samples.length > 1600) {
           processSpeech(segment.samples);
-        } else {
-          console.log('Ignored short audio segment');
         }
       }
     });

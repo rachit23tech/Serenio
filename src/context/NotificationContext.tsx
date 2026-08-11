@@ -1,7 +1,3 @@
-/**
- * NotificationContext.tsx - Comprehensive notification system
- */
-
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import type { AppNotification, NotificationSettings, MoodRecommendation, ActivityCompletion, EmotionState } from '../types/wellness';
 

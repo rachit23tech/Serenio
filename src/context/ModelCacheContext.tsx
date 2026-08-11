@@ -41,7 +41,7 @@ export function ModelCacheProvider({ children }: { children: ReactNode }) {
   const [statusText, setStatusText] = useState('Checking offline pack...');
   const runningRef = useRef(false);
 
-  const refreshState = useCallback(() => {
+  const refreshState = useCallback((sdkReadyState = sdkReady) => {
     const chatReady = Boolean(PREFERRED_MODEL_IDS[ModelCategory.Language] && isCached(PREFERRED_MODEL_IDS[ModelCategory.Language]!));
     const voiceReady = [
       PREFERRED_MODEL_IDS[ModelCategory.Language],
@@ -51,7 +51,7 @@ export function ModelCacheProvider({ children }: { children: ReactNode }) {
     ].every((id) => id && isCached(id));
     const packReady = OFFLINE_MODEL_PACK.every((id) => isCached(id));
 
-    if (!sdkReady) {
+    if (!sdkReadyState) {
       setCacheState('checking');
       setStatusText('Initializing AI system...');
       return { chatReady, voiceReady, packReady };
@@ -134,7 +134,7 @@ export function ModelCacheProvider({ children }: { children: ReactNode }) {
       .then(() => {
         if (cancelled) return;
         setSdkReady(true);
-        refreshState();
+        refreshState(true);
         if (navigator.onLine) {
           void ensureOfflinePack();
         }

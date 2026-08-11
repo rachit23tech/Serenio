@@ -1,7 +1,3 @@
-/**
- * NotificationCenter.tsx - In-app notification display component
- */
-
 import { useState, useEffect } from 'react';
 import { useNotifications } from '../context/NotificationContext';
 import { useTheme } from '../context/ThemeContext';

@@ -1,8 +1,3 @@
-/**
- * GoalsHub.tsx - Unified Goals & Accountability Dashboard
- * Combined Goals, Medications, Appointments, and Therapy Prep
- */
-
 import { useState, useMemo } from 'react';
 import { useTheme } from '../context/ThemeContext';
 import { useWellness } from '../context/WellnessContext';
@@ -25,18 +20,31 @@ export default function GoalsHub() {
 
   // Medications state
   const [showAddMed, setShowAddMed] = useState(false);
-  const [medForm, setMedForm] = useState({
+  const [medForm, setMedForm] = useState<{
+    name: string;
+    dosage: string;
+    times: string[];
+    frequency: 'daily' | 'weekly' | 'asneeded';
+    enabled: boolean;
+  }>({
     name: '',
     dosage: '',
     times: [''],
-    frequency: 'daily' as const,
+    frequency: 'daily',
     enabled: true,
   });
 
   // Appointments state
   const [showAddApt, setShowAddApt] = useState(false);
-  const [aptForm, setAptForm] = useState({
-    type: 'therapy' as const,
+  const [aptForm, setAptForm] = useState<{
+    type: 'therapy' | 'doctor' | 'psychiatrist' | 'other';
+    providerName: string;
+    date: string;
+    time: string;
+    notes: string;
+    reminder: boolean;
+  }>({
+    type: 'therapy',
     providerName: '',
     date: '',
     time: '',
@@ -924,7 +932,7 @@ export default function GoalsHub() {
                       </label>
                       <select
                         value={medForm.frequency}
-                        onChange={(e) => setMedForm(prev => ({ ...prev, frequency: e.target.value as any }))}
+                        onChange={(e) => setMedForm(prev => ({ ...prev, frequency: e.target.value as 'daily' | 'weekly' | 'asneeded' }))}
                         style={{
                           width: '100%',
                           padding: 12,
@@ -1101,7 +1109,7 @@ export default function GoalsHub() {
                       </label>
                       <select
                         value={aptForm.type}
-                        onChange={(e) => setAptForm(prev => ({ ...prev, type: e.target.value as any }))}
+                        onChange={(e) => setAptForm(prev => ({ ...prev, type: e.target.value as 'therapy' | 'doctor' | 'psychiatrist' | 'other' }))}
                         style={{
                           width: '100%',
                           padding: 12,

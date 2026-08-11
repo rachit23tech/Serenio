@@ -2,14 +2,15 @@ import { useState, useEffect } from 'react';
 import { initSDK, getAccelerationMode } from './runanywhere';
 import { ChatTab } from './components/ChatTab';
 import { VoiceTab } from './components/VoiceTab';
+import { Mic, MessageSquare, Smile, BookOpen, Zap, Cpu } from 'lucide-react';
 
 type Tab = 'voice' | 'chat' | 'mood' | 'history';
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'voice',   label: 'Voice',   icon: '🎙️' },
-  { id: 'chat',    label: 'Chat',    icon: '💬' },
-  { id: 'mood',    label: 'Mood',    icon: '😊' },
-  { id: 'history', label: 'History', icon: '📖' },
+const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: 'voice',   label: 'Voice',   icon: <Mic className="w-4 h-4" /> },
+  { id: 'chat',    label: 'Chat',    icon: <MessageSquare className="w-4 h-4" /> },
+  { id: 'mood',    label: 'Mood',    icon: <Smile className="w-4 h-4" /> },
+  { id: 'history', label: 'History', icon: <BookOpen className="w-4 h-4" /> },
 ];
 
 function LoadingScreen() {
@@ -52,14 +53,12 @@ export function App() {
   const [activeTab, setActiveTab] = useState<Tab>('voice');
 
   useEffect(() => {
-    console.log('🚀 Initializing SDK...');
     initSDK()
       .then(() => {
-        console.log('✅ SDK Ready!');
         setSdkReady(true);
       })
       .catch((err) => {
-        console.error('❌ SDK Error:', err);
+        console.error('SDK Error:', err);
         setSdkError(err instanceof Error ? err.message : String(err));
       });
   }, []);
@@ -84,12 +83,12 @@ export function App() {
           <p className="text-slate-600 text-[10px] tracking-widest uppercase mt-0.5">your calm companion</p>
         </div>
         {accel && (
-          <span className={`text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border font-light
+          <span className={`text-[10px] tracking-widest uppercase px-3 py-1.5 rounded-full border font-light flex items-center gap-1.5
             ${accel === 'webgpu'
               ? 'text-teal-400 border-teal-500/30 bg-teal-900/20'
               : 'text-slate-400 border-slate-600/40 bg-slate-800/40'
             }`}>
-            {accel === 'webgpu' ? '⚡ WebGPU' : '🖥 CPU'}
+            {accel === 'webgpu' ? <><Zap className="w-3 h-3 text-teal-400" /> WebGPU</> : <><Cpu className="w-3 h-3 text-slate-400" /> CPU</>}
           </span>
         )}
       </header>
@@ -106,7 +105,7 @@ export function App() {
                 : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/40'
               }`}
           >
-            <span className="text-base leading-none">{icon}</span>
+            {icon}
             <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
@@ -119,16 +118,18 @@ export function App() {
         {activeTab === 'mood' && (
           <div className="tab-panel">
             <div className="empty-state">
-              <h3>😊 Mood Check</h3>
-              <p>Coming soon — Person C is building this!</p>
+              <div className="flex justify-center mb-2"><Smile className="w-8 h-8 text-teal-400" /></div>
+              <h3>Mood Tracker</h3>
+              <p>Explore the full Mood Tracking experience from the navigation menu.</p>
             </div>
           </div>
         )}
         {activeTab === 'history' && (
           <div className="tab-panel">
             <div className="empty-state">
-              <h3>📖 Your Journal</h3>
-              <p>Coming soon — Person C is building this!</p>
+              <div className="flex justify-center mb-2"><BookOpen className="w-8 h-8 text-indigo-400" /></div>
+              <h3>Journal History</h3>
+              <p>View your full private conversation and mood history from the navigation menu.</p>
             </div>
           </div>
         )}
@@ -136,5 +137,3 @@ export function App() {
     </div>
   );
 }
-
-

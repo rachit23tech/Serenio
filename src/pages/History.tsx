@@ -27,7 +27,7 @@ function formatDate(date: Date): string {
 export default function History() {
   const { dark } = useTheme();
   const t = getTheme(dark);
-  const { sessions, clearHistory } = useHistory();
+  const { sessions, clearHistory, deleteSession } = useHistory();
   const [query, setQuery] = useState('');
 
   const filteredSessions = useMemo(() => {
@@ -157,7 +157,24 @@ export default function History() {
                         {session.type === 'voice' ? 'Voice check-in' : 'Chat check-in'}
                       </span>
                     </div>
-                    <span style={{ fontSize: 28 }}>{MOOD_EMOJI[session.mood]}</span>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <button
+                        onClick={() => deleteSession(session.id)}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 999,
+                          border: `1px solid ${t.border}`,
+                          background: 'transparent',
+                          color: t.textMuted,
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-sans)',
+                          fontSize: 12,
+                        }}
+                      >
+                        Delete
+                      </button>
+                      <span style={{ fontSize: 28 }}>{MOOD_EMOJI[session.mood]}</span>
+                    </div>
                   </div>
 
                   <div style={{ height: 1, background: t.divider, marginBottom: 16 }} />

@@ -1,8 +1,3 @@
-/**
- * VentingSpace.tsx - No-judgment venting mode
- * Route: /venting
- */
-
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWellness } from '../context/WellnessContext';

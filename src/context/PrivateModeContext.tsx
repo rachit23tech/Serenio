@@ -1,7 +1,3 @@
-/**
- * PrivateModeContext.tsx - Incognito mode for private conversations
- */
-
 import { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import { useNotifications } from './NotificationContext';
 

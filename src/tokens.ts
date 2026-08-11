@@ -1,11 +1,3 @@
-/**
- * tokens.ts
- * ─────────────────────────────────────────────────────────────
- * LIGHT: orange accent #E8845A (warm, friendly)
- * DARK:  orb-teal accent #68A8A8 (matches the orb, not orange)
- * ─────────────────────────────────────────────────────────────
- */
-
 export const LIGHT = {
   bg:          "#F2EBE0",
   sidebar:     "#FFFFFF",

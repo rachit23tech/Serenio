@@ -1,8 +1,3 @@
-/**
- * Landing.tsx — Splash / welcome screen
- * Route: /
- */
-
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../context/ThemeContext";

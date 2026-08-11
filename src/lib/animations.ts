@@ -1,7 +1,3 @@
-/**
- * animations.ts - Smooth animation utilities and constants
- */
-
 import { useState, useCallback } from 'react';
 
 // Animation duration constants

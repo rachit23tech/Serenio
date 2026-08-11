@@ -1,10 +1,3 @@
-/**
- * ThemeContext.tsx
- * Provides dark/light mode toggle across the entire app.
- * Usage: const { dark, toggleDark } = useTheme();
- * Wrap app in <ThemeProvider> inside main.tsx.
- */
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 interface ThemeContextType {
@@ -15,12 +8,9 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({ dark: false, toggleDark: () => {} });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [dark, setDark] = useState(false);
-
-  useEffect(() => {
-    const saved = localStorage.getItem("serenio-dark");
-    if (saved === "true") setDark(true);
-  }, []);
+  const [dark, setDark] = useState(() => {
+    return localStorage.getItem("serenio-dark") === "true";
+  });
 
   const toggleDark = () => {
     setDark((prev) => {

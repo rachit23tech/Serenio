@@ -1,9 +1,3 @@
-/**
- * Mood.tsx — Mood check-in with random activity suggestions
- * Quote generator removed
- * Route: /mood
- */
-
 import { useState } from "react";
 import Sidebar from "../components/Sidebar";
 import ActivityTimer from "../components/ActivityTimer";
